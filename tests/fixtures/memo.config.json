@@ -1,0 +1,8 @@
+{
+  "site_name": "TEST MEMO",
+  "description": "テスト用のメモ置き場",
+  "llms_description": "テスト用のメモの集まり。",
+  "repository": "example/test-memo",
+  "branch": "main",
+  "utc_offset_hours": 9
+}

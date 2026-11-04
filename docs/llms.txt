@@ -1,0 +1,8 @@
+# MemoKit
+
+> Claude に作ってもらった解説ページの集まり。各リンク先は本文を Markdown にしたもので、元のページへの URL も含む。
+
+## Memos
+
+- [サンプルのメモ](https://repo.github.io/sample/md/sample.md): テスト用のサンプル。クイズと別メモへのリンクを含む（サンプル, テスト / 2026-01-10）
+- [クイズのないメモ](https://repo.github.io/sample/md/sample-plain.md): テスト用のサンプル。クイズを含まない（テスト / 2026-01-05）

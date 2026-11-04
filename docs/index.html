@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title data-memo-site="{site_name}">MemoKit</title>
+<meta name="description" content="Claude に作ってもらった解説ページの置き場" data-memo-site-content="{description}">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Noto+Sans+JP:wght@400;500;700&display=swap">
+<style>
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --fg: #1c2230;
+  --fg-2: #5a6376;
+  --line: #dde1e8;
+  --accent: #0077b6;
+  --chip: #eceff4;
+  --ok: #1a7f37;
+  --ng: #cf222e;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0a0e14;
+    --surface: #111823;
+    --fg: #cdd9e5;
+    --fg-2: #7d8b9d;
+    --line: #1e2d3d;
+    --accent: #00d4ff;
+    --chip: #18222f;
+    --ok: #3fb950;
+    --ng: #f85149;
+  }
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: 'Noto Sans JP', system-ui, sans-serif;
+  min-height: 100vh;
+  padding: 48px 16px 64px;
+}
+.wrap { max-width: 880px; margin: 0 auto; }
+header { margin-bottom: 28px; }
+h1 {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 1.6rem;
+  letter-spacing: 0.12em;
+  color: var(--accent);
+}
+.lead { color: var(--fg-2); font-size: 0.85rem; margin-top: 6px; }
+
+.controls { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+#q {
+  flex: 1 1 220px;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--fg);
+  font: inherit;
+  font-size: 0.9rem;
+}
+#q:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.refresh-btn {
+  display: inline-flex; align-items: center; gap: 6px; flex: none;
+  border: 1px solid var(--line);
+  background: var(--chip);
+  color: var(--fg-2);
+  border-radius: 8px;
+  padding: 0 14px;
+  font: 600 0.8rem 'JetBrains Mono', monospace;
+  cursor: pointer;
+}
+.refresh-btn:hover { border-color: var(--accent); color: var(--accent); }
+.refresh-btn svg { transition: transform .5s ease; }
+.refresh-btn.spinning svg { animation: spin .6s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag {
+  border: 1px solid var(--line);
+  background: var(--chip);
+  color: var(--fg-2);
+  border-radius: 999px;
+  padding: 4px 11px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+.tag[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 12px;
+}
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 18px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: inherit;
+  text-decoration: none;
+  transition: border-color .15s, transform .15s;
+}
+.card:hover { border-color: var(--accent); transform: translateY(-2px); }
+.card h2 { font-size: 1rem; font-weight: 700; }
+.card p { font-size: 0.82rem; color: var(--fg-2); line-height: 1.6; flex: 1; }
+.meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; color: var(--fg-2); }
+.meta span.t { background: var(--chip); border-radius: 4px; padding: 1px 6px; }
+.meta time { margin-left: auto; }
+.empty { color: var(--fg-2); font-size: 0.85rem; padding: 24px 0; }
+/* ランダムクイズ（普段は閉じておく） */
+.rq { margin: -8px 0 20px; }
+.rq > summary {
+  display: inline-flex; align-items: center; gap: 6px;
+  list-style: none; cursor: pointer; user-select: none;
+  color: var(--fg-2);
+  font: 600 0.75rem 'JetBrains Mono', monospace;
+  padding: 4px 2px;
+}
+.rq > summary::-webkit-details-marker { display: none; }
+.rq > summary::after { content: '▸'; display: inline-block; transition: transform .15s; }
+.rq[open] > summary::after { transform: rotate(90deg); }
+.rq > summary:hover { color: var(--accent); }
+.rq-body {
+  margin-top: 8px;
+  padding: 16px 18px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.rq-from { font-size: 0.72rem; color: var(--fg-2); font-family: 'JetBrains Mono', monospace; }
+.rq-q { font-weight: 700; margin: 4px 0 10px; line-height: 1.6; }
+.rq-choices { display: flex; flex-direction: column; gap: 6px; }
+.rq-c {
+  text-align: left; padding: 8px 12px;
+  border: 1px solid var(--line); border-radius: 8px;
+  background: var(--chip); color: var(--fg);
+  font: inherit; font-size: 0.88rem; line-height: 1.5; cursor: pointer;
+}
+.rq-c:hover:not(:disabled) { border-color: var(--accent); }
+.rq-c:disabled { cursor: default; opacity: .6; }
+.rq-c.ok { opacity: 1; border-color: var(--ok); box-shadow: inset 3px 0 0 var(--ok); }
+.rq-c.ng { opacity: 1; border-color: var(--ng); box-shadow: inset 3px 0 0 var(--ng); }
+.rq-fb { margin-top: 10px; font-size: 0.83rem; color: var(--fg-2); line-height: 1.6; }
+.rq-fb b.ok { color: var(--ok); }
+.rq-fb b.ng { color: var(--ng); }
+.rq-actions { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin-top: 12px; }
+.rq-actions a { color: var(--accent); font-size: 0.8rem; font-weight: 700; text-decoration: none; }
+.rq-actions a:hover { text-decoration: underline; }
+.rq-actions a.rq-more { margin-left: auto; color: var(--fg-2); font-weight: 600; font-size: 0.75rem; }
+.rq-actions a.rq-more:hover { color: var(--accent); }
+.rq-next {
+  border: 1px solid var(--line); background: var(--chip); color: var(--fg-2);
+  border-radius: 999px; padding: 4px 12px;
+  font: 600 0.75rem 'JetBrains Mono', monospace; cursor: pointer;
+}
+.rq-next:hover { border-color: var(--accent); color: var(--accent); }
+footer { margin-top: 40px; font-size: 0.75rem; color: var(--fg-2); }
+footer a { color: var(--accent); }
+</style>
+<!-- memo:head（scripts/memo.py が自動生成。手で編集しない） -->
+<link rel="icon" href="assets/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-title" content="MemoKit">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="MemoKit">
+<meta property="og:title" content="MemoKit">
+<meta property="og:description" content="Claude に作ってもらった解説ページの置き場">
+<meta property="og:url" content="https://repo.github.io/sample/">
+<meta property="og:image" content="https://repo.github.io/sample/assets/og.png?v=258752a2">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<style id="memo-accent">html:root{--accent:#0077b6}@media (prefers-color-scheme: dark){html:root{--accent:#00d4ff}}</style>
+<!-- /memo:head -->
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1 data-memo-site="{site_name}">MemoKit</h1>
+    <p class="lead" data-memo-site="{description}">Claude に作ってもらった解説ページの置き場</p>
+  </header>
+
+  <div class="controls">
+    <input id="q" type="search" placeholder="検索…" aria-label="メモを検索">
+    <button id="refresh" class="refresh-btn" type="button" title="最新の一覧に更新" aria-label="最新の一覧に更新">
+      <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M13.65 2.35A6.97 6.97 0 0 0 8 0a7 7 0 1 0 6.93 8h-1.52A5.5 5.5 0 1 1 8 1.5c1.52 0 2.87.68 3.78 1.75L9.5 5.5H15V0l-1.35 2.35Z" fill="currentColor"/></svg>
+      更新
+    </button>
+    <div class="tags" id="tags"></div>
+  </div>
+
+  <details class="rq" id="rq" hidden>
+    <summary>🎲 ランダムクイズ</summary>
+    <div class="rq-body">
+      <p class="rq-from" id="rq-from"></p>
+      <p class="rq-q" id="rq-q"></p>
+      <div class="rq-choices" id="rq-choices"></div>
+      <p class="rq-fb" id="rq-fb" hidden></p>
+      <div class="rq-actions">
+        <button class="rq-next" id="rq-next" type="button">次の問題 →</button>
+        <a id="rq-link" href="#" hidden></a>
+        <a class="rq-more" href="quiz.html">🎯 10 問に挑戦（ランダム・カテゴリ別）</a>
+      </div>
+    </div>
+  </details>
+
+  <div class="grid" id="list"></div>
+  <p class="empty" id="empty" hidden>該当するメモがありません</p>
+
+  <footer>
+    <a href="https://github.com/repo/sample" data-memo-site="github.com/{repository}" data-memo-site-href="https://github.com/{repository}">github.com/repo/sample</a>
+  </footer>
+</div>
+
+<script>
+// 一覧は memos.json、ランダムクイズの問題は quizzes.json から読み込む（どちらも memo.py build が生成。memo-detail.md 参照）
+// memo.py preview で作ったプレビュー用のコピーでは、埋め込まれた window.MEMO_DATA を使う
+const MEMO_DATA = window.MEMO_DATA || null;
+async function loadJSON(name, fresh) {
+  if (MEMO_DATA && MEMO_DATA[name]) return MEMO_DATA[name];
+  // fresh: GitHub Pages の CDN キャッシュも避けて最新を取りに行く
+  const res = await fetch(fresh ? `${name}?_=${Date.now()}` : name, { cache: fresh ? 'no-store' : 'no-cache' });
+  if (!res.ok) throw new Error(`${name}: HTTP ${res.status}`);
+  return res.json();
+}
+
+const list = document.getElementById('list');
+const empty = document.getElementById('empty');
+const q = document.getElementById('q');
+const tagBox = document.getElementById('tags');
+let MEMOS = [];
+let activeTag = null;
+
+function buildTags() {
+  const allTags = [...new Set(MEMOS.flatMap(m => m.tags || []))].sort();
+  if (!allTags.includes(activeTag)) activeTag = null;
+  tagBox.textContent = '';
+  for (const t of allTags) {
+    const b = document.createElement('button');
+    b.className = 'tag';
+    b.textContent = t;
+    b.setAttribute('aria-pressed', String(t === activeTag));
+    b.onclick = () => {
+      activeTag = activeTag === t ? null : t;
+      tagBox.querySelectorAll('.tag').forEach(x =>
+        x.setAttribute('aria-pressed', String(x.textContent === activeTag)));
+      render();
+    };
+    tagBox.appendChild(b);
+  }
+}
+
+const esc = s => String(s).replace(/[&<>"']/g, c =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+function render() {
+  const word = q.value.trim().toLowerCase();
+  const items = MEMOS
+    .filter(m => !activeTag || (m.tags || []).includes(activeTag))
+    .filter(m => !word || [m.title, m.desc, ...(m.tags || [])].join(' ').toLowerCase().includes(word))
+    .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
+  list.innerHTML = items.map(m => `
+    <a class="card" href="${esc(m.file)}">
+      <h2>${esc(m.title)}</h2>
+      <p>${esc(m.desc || '')}</p>
+      <div class="meta">
+        ${(m.tags || []).map(t => `<span class="t">${esc(t)}</span>`).join('')}
+        ${m.date ? `<time>${esc(m.date)}</time>` : ''}
+      </div>
+    </a>`).join('');
+  empty.textContent = '該当するメモがありません';
+  empty.hidden = items.length > 0;
+}
+
+async function loadList(fresh) {
+  try {
+    MEMOS = await loadJSON('memos.json', fresh);
+  } catch (e) {
+    list.textContent = '';
+    empty.textContent = '一覧を読み込めませんでした。ファイルを直接開いた場合や会話内のプレビューでは表示されません（memo.py preview index で埋め込んだ版を作れます）。';
+    empty.hidden = false;
+    return;
+  }
+  buildTags();
+  render();
+  randomQuiz.update(MEMOS.reduce((n, m) => n + (m.quizzes || 0), 0), fresh);
+}
+
+q.addEventListener('input', render);
+
+document.getElementById('refresh').addEventListener('click', e => {
+  const btn = e.currentTarget;
+  btn.classList.add('spinning');
+  btn.disabled = true;
+  loadList(true).finally(() => {
+    btn.classList.remove('spinning');
+    btn.disabled = false;
+  });
+});
+
+// ---- ランダムクイズ（全メモの確認クイズから 1 問。開いたときに quizzes.json を読み込む）
+const randomQuiz = (() => {
+  const box = document.getElementById('rq');
+  const $ = id => document.getElementById(id);
+  let pool = null;
+  let fresh = false;
+  let last = -1;
+
+  function show() {
+    if (!pool || !pool.length) return;
+    let i = Math.floor(Math.random() * pool.length);
+    if (pool.length > 1 && i === last) i = (i + 1) % pool.length;
+    last = i;
+    const q = pool[i];
+    $('rq-from').textContent = q.title;
+    $('rq-q').textContent = q.q;
+    $('rq-fb').hidden = true;
+    $('rq-link').hidden = true;
+    // 選択肢は毎回シャッフル（正解の位置で覚えないように）
+    const order = q.choices.map((_, k) => k).sort(() => Math.random() - 0.5);
+    const ch = $('rq-choices');
+    ch.textContent = '';
+    for (const k of order) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'rq-c';
+      b.textContent = q.choices[k];
+      b.dataset.k = k;
+      b.onclick = () => answer(q, k);
+      ch.appendChild(b);
+    }
+  }
+
+  function answer(q, k) {
+    const ok = k === q.answer;
+    for (const b of $('rq-choices').children) {
+      b.disabled = true;
+      if (+b.dataset.k === q.answer) b.classList.add('ok');
+      else if (+b.dataset.k === k) b.classList.add('ng');
+    }
+    const fb = $('rq-fb');
+    fb.innerHTML = ok ? '<b class="ok">⭕ 正解</b> ' : '<b class="ng">❌ 不正解</b> ';
+    fb.append((ok ? '' : `（正解: ${q.choices[q.answer]}）`) + (q.explain || ''));
+    fb.hidden = false;
+    const link = $('rq-link');
+    link.href = q.file + (!ok && q.ref ? q.ref : '');
+    link.textContent = ok ? 'このメモを読む →' : '本文で確認する →';
+    link.hidden = false;
+  }
+
+  async function open() {
+    if (!pool) {
+      $('rq-from').textContent = '';
+      $('rq-q').textContent = '読み込み中…';
+      $('rq-choices').textContent = '';
+      try {
+        pool = await loadJSON('quizzes.json', fresh);
+      } catch (e) {
+        $('rq-q').textContent = '問題を読み込めませんでした。';
+        return;
+      }
+      fresh = false;
+      last = -1;
+    }
+    if (last < 0) show();
+  }
+
+  box.addEventListener('toggle', () => { if (box.open) open(); });
+  $('rq-next').onclick = show;
+
+  return {
+    // total: memos.json から数えた問題数。fresh: 一覧を更新したときは問題も読み直す
+    update(total, isFresh) {
+      box.hidden = !total;
+      box.querySelector('summary').textContent = `🎲 ランダムクイズ（${total} 問）`;
+      if (isFresh) {
+        pool = null;
+        fresh = true;
+        if (box.open) open();
+      }
+    },
+  };
+})();
+
+loadList(false);
+</script>
+</body>
+</html>

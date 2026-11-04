@@ -1,0 +1,5 @@
+[
+{"file": "sample.html", "title": "サンプルのメモ", "q": "一覧データを作るコマンドは？", "choices": ["lint", "build", "url"], "answer": 1, "explain": "build が memos.json などを生成する。", "ref": "#intro"},
+{"file": "sample.html", "title": "サンプルのメモ", "q": "新しいメモを作るコマンドは？", "choices": ["new", "list", "path"], "answer": 0, "ref": "#usage"},
+{"file": "sample.html", "title": "サンプルのメモ", "q": "一覧の情報を付けるコマンドは？", "choices": ["preview", "add", "meta"], "answer": 2, "ref": "#usage"}
+]
