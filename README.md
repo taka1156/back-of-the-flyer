@@ -123,10 +123,3 @@ python3 -B -m unittest discover -s tests   # テスト
 ファイルの構成（原本と生成物）、`scripts/memo.py` の各コマンド、自動生成ブロック、確認クイズのデータの流れ、AI 向けの Markdown 版（`llms.txt`）、サイトごとの設定（`memo.config.json`）、表示の確認とプレビュー、GitHub Actions は、図つきで [memo-detail.md](memo-detail.md) にまとめています。
 
 メモ（中身）と仕組みは分けてあり、仕組みは本物のメモがなくても動きます（テストは `tests/fixtures/` のサンプルで動く）。残すもの・消すものの一覧は [memo-detail.md の「このキットから始める」](memo-detail.md#このキットから始める) にあります。
-
-## ライセンス
-
-[MIT License](LICENSE)。
-
-テンプレートから作ったリポジトリにもこの `LICENSE` がそのまま入ります。仕組み（スクリプト・スキル・テンプレートなど）を使う分には、著作権表示を残せば自由に改変・再配布できます。
-`LICENSE` はリポジトリ全体に掛かるように見えるので、自分のメモ（`docs/` の中身）を MIT にしたくない場合は、README などにメモの扱いを別に書いてください（例: 「`docs/` のメモは CC BY 4.0」「メモの著作権は作者に帰属」）。
