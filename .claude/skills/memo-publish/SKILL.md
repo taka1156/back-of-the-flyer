@@ -1,11 +1,11 @@
 ---
 name: memo-publish
-description: Claude が作った HTML（貼り付け・添付・アーティファクト・既存ファイル）を MEMO リポジトリに登録する。「MEMO に入れて」「メモに追加」「これ保存して」と言われたとき、または memo-from-chat の最後の工程で使う。崩れチェック・メタ情報付与・一覧更新・commit/push まで行う。
+description: Claude が作った HTML（貼り付け・添付・アーティファクト・既存ファイル）を CheatSheet リポジトリに登録する。「CheatSheet に入れて」「チートシートに追加」「これ保存して」と言われたとき、または memo-from-chat の最後の工程で使う。崩れチェック・メタ情報付与・一覧更新・commit/push まで行う。
 ---
 
 # memo-publish
 
-HTML 1 枚を MEMO として登録する手順。
+HTML 1 枚を CheatSheet として登録する手順。
 
 ## 前提
 

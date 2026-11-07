@@ -1,11 +1,11 @@
 ---
 name: memo-maintain
-description: MEMO リポジトリの Python スクリプト（scripts/memo.py・scripts/memolib/・tests/）やトップ・ロードマップページの JS、GitHub Actions を直すときの手順。「memo.py を直して」「コマンドを追加して」「リファクタして」「テストを足して」などで使う。メモの作成・登録・参照には使わない（memo-style / memo-publish / memo-reference）。
+description: CheatSheet リポジトリの Python スクリプト（scripts/memo.py・scripts/memolib/・tests/）やトップ・ロードマップページの JS、GitHub Actions を直すときの手順。「memo.py を直して」「コマンドを追加して」「リファクタして」「テストを足して」などで使う。メモの作成・登録・参照には使わない（memo-style / memo-publish / memo-reference）。
 ---
 
 # memo-maintain
 
-MEMO の仕組みそのもの（スクリプト・共通ファイル・ワークフロー）を変えるときの手順。
+CheatSheet の仕組みそのもの（スクリプト・共通ファイル・ワークフロー）を変えるときの手順。
 仕組みの全体像は `memo-detail.md`（リポジトリ直下）が唯一の説明書なので、**まずそこを読み、最後にそこを更新する**。
 
 ## 守ること
