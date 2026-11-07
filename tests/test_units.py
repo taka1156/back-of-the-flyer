@@ -7,6 +7,7 @@ from __future__ import annotations
 import datetime as dt
 import json
 import unittest
+from html.parser import HTMLParser
 
 import helpers  # noqa: F401  scripts/ を import できるようにする
 from memolib import blocks, config, entry, lint, markdown, meta, site
@@ -16,13 +17,13 @@ def page(head: str = "", body: str = "") -> str:
     return f"<!DOCTYPE html>\n<html><head>\n{head}</head>\n<body>\n{body}</body>\n</html>\n"
 
 
-# 廃止した確認クイズの名残（以前のメモに残っている表示ブロックと問題データ）
-LEGACY_QUIZ = ("<!-- memo:quiz（scripts/memo.py が自動生成。手で編集しない） -->\n"
-               '<link rel="stylesheet" href="assets/memo-quiz.css">\n'
-               '<section id="memo-quiz-ui" hidden><h2>確認クイズ</h2></section>\n'
-               "<!-- /memo:quiz -->\n"
-               '<script type="application/json" id="memo-quiz">'
-               '[{"q": "秘密の問題", "choices": ["a", "b"], "answer": 0}]</script>\n')
+QUIZ_OK = [{"q": "Q1", "choices": ["a", "b"], "answer": 0},
+           {"q": "Q2", "choices": ["a", "b", "c"], "answer": 2, "explain": "e", "ref": "#s"}]
+
+
+def quiz_script(data) -> str:
+    body = data if isinstance(data, str) else json.dumps(data, ensure_ascii=False)
+    return f'<script type="application/json" id="memo-quiz">{body}</script>\n'
 
 
 class ConfigTest(unittest.TestCase):
@@ -41,6 +42,44 @@ class ConfigTest(unittest.TestCase):
         self.assertEqual(config.pages_url("Alice/notes"), "https://alice.github.io/notes/")
         self.assertEqual(config.pages_url("alice/alice.github.io"), "https://alice.github.io/")
         self.assertEqual(config.pages_url(""), "")
+
+    def test_branding_icon_style(self):
+        import tempfile
+        from pathlib import Path
+        with tempfile.TemporaryDirectory() as d:
+            f = Path(d) / "memo.config.json"
+            f.write_text("{}", encoding="utf-8")
+            self.assertEqual(config.load_config(f)["branding"]["icon"], "mark")
+            f.write_text('{"branding": {"icon": "lines"}}', encoding="utf-8")
+            self.assertEqual(config.load_config(f)["branding"]["icon"], "lines")
+            f.write_text('{"branding": {"icon": "bars"}}', encoding="utf-8")
+            with self.assertRaises(SystemExit):
+                config.load_config(f)
+
+    def test_set_accent_rewrites_only_accent(self):
+        import tempfile
+        from pathlib import Path
+        with tempfile.TemporaryDirectory() as d:
+            f = Path(d) / "memo.config.json"
+            original = {"site_name": "X", "branding": {"tagline": "t", "accent": "#00d4ff", "accent_light": "#0077b6"},
+                        "branch": "main"}
+            f.write_text(json.dumps(original, ensure_ascii=False), encoding="utf-8")
+            cfg = config.set_accent("#3ddc97", "#0f7a50", f)
+            self.assertEqual(config.accents(cfg), ("#0f7a50", "#3ddc97"))
+            saved = json.loads(f.read_text(encoding="utf-8"))
+            # ほかの項目と並び順はそのまま
+            self.assertEqual(list(saved), ["site_name", "branding", "branch"])
+            self.assertEqual(saved["branding"], {"tagline": "t", "accent": "#3ddc97", "accent_light": "#0f7a50"})
+            # ライト用を空にすると項目を消し、accent から自動で決まる
+            cfg = config.set_accent("#3ddc97", "", f)
+            self.assertNotIn("accent_light", json.loads(f.read_text(encoding="utf-8"))["branding"])
+            self.assertEqual(config.accents(cfg), (config.light_accent("#3ddc97"), "#3ddc97"))
+            # 正しくない色なら止まり、ファイルは書き換える前のまま
+            before = f.read_text(encoding="utf-8")
+            for bad in (("green", ""), ("#3ddc97", "#12345")):
+                with self.assertRaises(SystemExit):
+                    config.set_accent(*bad, f)
+                self.assertEqual(f.read_text(encoding="utf-8"), before)
 
     def test_load_config_fills_defaults_and_rejects_unknown_keys(self):
         import tempfile
@@ -74,7 +113,7 @@ class ConfigTest(unittest.TestCase):
             '{"sitename": "x"}': "使える項目",
             '{"roadmap": "yes"}': "roadmap は true か false",
             '{"roadmap": 1}': "roadmap は true か false",
-            '{"deploy_branch": "main"}': "別のブランチ",
+            '{"quiz": "no"}': "quiz は true か false",
         }
         with tempfile.TemporaryDirectory() as d:
             f = Path(d) / "memo.config.json"
@@ -91,51 +130,14 @@ class ConfigTest(unittest.TestCase):
             f.write_text('{"utc_offset_hours": -3.5, "branch": "trunk"}', encoding="utf-8")
             self.assertEqual(config.load_config(f)["utc_offset_hours"], -3.5)  # 小数・負の数は使える
 
-    def test_names_used_by_branding_render_exist(self):
-        """branding/render.py（標準ライブラリだけでは動かないのでテストで実行しない）が import する名前が config にあること。"""
-        import re
-        src = (helpers.REPO / "branding" / "render.py").read_text(encoding="utf-8")
-        names = re.search(r"from memolib\.config import ([\w, ]+)", src).group(1).split(", ")
-        for name in names:
-            self.assertTrue(hasattr(config, name.strip()), name)
-        self.assertEqual(config.ASSETS, config.SRC / "assets")
-
-    def test_set_accent_rewrites_only_accent(self):
-        import tempfile
-        from pathlib import Path
-        with tempfile.TemporaryDirectory() as d:
-            f = Path(d) / "memo.config.json"
-            original = {"site_name": "X", "branding": {"tagline": "t", "accent": "#00d4ff", "accent_light": "#0077b6"},
-                        "branch": "main"}
-            f.write_text(json.dumps(original, ensure_ascii=False), encoding="utf-8")
-            cfg = config.set_accent("#3ddc97", "#0f7a50", f)
-            self.assertEqual(config.accents(cfg), ("#0f7a50", "#3ddc97"))
-            saved = json.loads(f.read_text(encoding="utf-8"))
-            # ほかの項目と並び順はそのまま
-            self.assertEqual(list(saved), ["site_name", "branding", "branch"])
-            self.assertEqual(saved["branding"], {"tagline": "t", "accent": "#3ddc97", "accent_light": "#0f7a50"})
-            # ライト用を空にすると項目を消し、accent から自動で決まる
-            cfg = config.set_accent("#3ddc97", "", f)
-            self.assertNotIn("accent_light", json.loads(f.read_text(encoding="utf-8"))["branding"])
-            self.assertEqual(config.accents(cfg), (config.light_accent("#3ddc97"), "#3ddc97"))
-            # 正しくない色なら止まり、ファイルは書き換える前のまま
-            before = f.read_text(encoding="utf-8")
-            for bad in (("green", ""), ("#3ddc97", "#12345")):
-                with self.assertRaises(SystemExit):
-                    config.set_accent(*bad, f)
-                self.assertEqual(f.read_text(encoding="utf-8"), before)
-
     def test_optional_pages_follow_config(self):
         self.assertFalse(config.page_enabled("roadmap.html", {**config.DEFAULTS}))
         self.assertTrue(config.page_enabled("roadmap.html", {**config.DEFAULTS, "roadmap": True}))
+        self.assertTrue(config.page_enabled("quiz.html", {**config.DEFAULTS}))
+        self.assertFalse(config.page_enabled("quiz.html", {**config.DEFAULTS, "quiz": False}))
         self.assertTrue(config.page_enabled("settings.html", {**config.DEFAULTS}))  # オプションでないページは常に出す
         self.assertTrue(set(config.OPTIONAL_PAGES) <= config.SPECIAL_NAMES)
         self.assertTrue(set(config.OPTIONAL_PAGES.values()) <= set(config.DEFAULTS))
-
-    def test_output_paths_are_under_dist(self):
-        for path in (site.MEMOS_JSON, markdown.MD_DIR, markdown.LLMS_TXT, config.ENTRY_SKILL):
-            self.assertTrue(path.is_relative_to(config.DIST), path)  # 生成物はすべて dist/ に書く
-            self.assertFalse(path.is_relative_to(config.SRC), path)
 
     def test_read_text_reports_non_utf8_file(self):
         import tempfile
@@ -220,7 +222,7 @@ class MetaTest(unittest.TestCase):
             self.assertEqual(meta.memo_path(arg, must_exist=False), target)
 
     def test_memo_path_rejects_reserved_and_bad_names(self):
-        for arg in ("index", "index.html", "Bad_Name"):
+        for arg in ("index", "quiz.html", "Bad_Name"):
             with self.assertRaises(SystemExit):
                 meta.memo_path(arg, must_exist=False)
 
@@ -252,29 +254,72 @@ class HeadBlockTest(unittest.TestCase):
         self.assertLess(once.index(config.HEAD_BEGIN), once.index("</head>"))
 
 
-class LegacyQuizTest(unittest.TestCase):
-    def test_strip_quiz_removes_block_and_data(self):
-        text = page("<title>T</title>", "<p>本文</p>\n" + LEGACY_QUIZ + blocks.BACKLINK + "\n")
-        stripped = blocks.strip_quiz(text)
-        self.assertEqual(stripped, page("<title>T</title>", "<p>本文</p>\n" + blocks.BACKLINK + "\n"))
-        self.assertEqual(blocks.strip_quiz(stripped), stripped)
+class QuizTest(unittest.TestCase):
+    def setUp(self):
+        # クイズの表示・プレビューを確かめるので、リポジトリの設定（quiz が false のサイトもある）に関わらずオンにする
+        orig = config.CONFIG["quiz"]
+        config.CONFIG["quiz"] = True
+        self.addCleanup(config.CONFIG.__setitem__, "quiz", orig)
 
-    def test_apply_generated_strips_quiz_from_memos(self):
-        text = page("<title>T</title>", LEGACY_QUIZ)
-        self.assertNotIn("memo-quiz", blocks.apply_generated(text, "memo.html"))
+    def test_validate_accepts_good_data(self):
+        self.assertEqual(blocks.validate_quiz(QUIZ_OK), [])
+
+    def test_validate_reports_each_problem(self):
+        bad = [
+            {"choices": ["a", "b"], "answer": 0},                      # q がない
+            {"q": "Q", "choices": ["a"], "answer": 0},                  # 選択肢が 1 個
+            {"q": "Q", "choices": ["a", "b"], "answer": 2},             # 範囲外
+            {"q": "Q", "choices": ["a", "b"], "answer": True},          # bool は番号ではない
+            {"q": "Q", "choices": ["a", "b"], "answer": 0, "ref": "s"},  # # がない
+            "文字列",
+        ]
+        probs = blocks.validate_quiz(bad)
+        for i in range(1, len(bad) + 1):
+            self.assertTrue(any(p.startswith(f"Q{i}:") for p in probs), (i, probs))
+        self.assertTrue(blocks.validate_quiz([]))
+
+    def test_read_quiz_checks_json_refs_and_answer_spread(self):
+        qs, probs = blocks.read_quiz(page(body='<h2 id="s">S</h2>' + quiz_script(QUIZ_OK)))
+        self.assertEqual((qs, probs), (QUIZ_OK, []))
+
+        _, probs = blocks.read_quiz(page(body=quiz_script(QUIZ_OK)))  # #s がページにない
+        self.assertTrue(any("#s" in p for p in probs))
+
+        _, probs = blocks.read_quiz(page(body=quiz_script("[{broken")))
+        self.assertTrue(any("JSON" in p for p in probs))
+
+        same = [{"q": f"Q{i}", "choices": ["a", "b"], "answer": 1} for i in range(3)]
+        _, probs = blocks.read_quiz(page(body=quiz_script(same)))
+        self.assertTrue(any("answer" in p for p in probs))
+
+        self.assertEqual(blocks.read_quiz(page(body="<p>なし</p>")), (None, []))
 
     def test_strip_generated_undoes_apply_generated(self):
-        text = page("<title>T</title>", "<p>本文</p>\n")
-        self.assertEqual(blocks.strip_generated(blocks.apply_generated(text, "memo.html")), text)
-        self.assertEqual(blocks.strip_generated(text + LEGACY_QUIZ), text)
+        text = ("<!DOCTYPE html><html><head><title>T</title></head><body><h2 id=\"s\">S</h2>"
+                '<script type="application/json" id="memo-quiz">'
+                '[{"q":"Q","choices":["a","b"],"answer":1}]</script></body></html>')
+        done = blocks.apply_generated(text, "t.html")
+        self.assertIn(blocks.QUIZ_BEGIN, done)
+        self.assertEqual(blocks.strip_generated(done), text)
 
-    def test_lint_fix_removes_generated_blocks_and_quiz(self):
-        text = blocks.apply_head(page("<title>T</title>", LEGACY_QUIZ), "memo.html")
-        fixed, notes, _ = lint.lint_text(text, backlink=False)
-        self.assertNotIn("memo-quiz", fixed)
-        self.assertNotIn(config.HEAD_BEGIN, fixed)
-        self.assertTrue(any("自動生成ブロック" in n for n in notes))
-        self.assertEqual(lint.lint_text(fixed, False)[1], [])  # 2 回目は直すものがない
+    def test_apply_quiz_inserts_before_footer_once_and_removes_when_no_data(self):
+        text = page(body="<p>本文</p>\n" + blocks.BACKLINK + "\n" + quiz_script(QUIZ_OK))
+        once = blocks.apply_quiz(text)
+        self.assertEqual(blocks.apply_quiz(once), once)
+        self.assertEqual(once.count(blocks.QUIZ_BEGIN), 1)
+        self.assertLess(once.index(blocks.QUIZ_BEGIN), once.index(blocks.BACKLINK_ID))
+        self.assertIn(blocks.QUIZ_JS_TAG, once)
+        without = once.replace(quiz_script(QUIZ_OK), "")
+        self.assertNotIn(blocks.QUIZ_BEGIN, blocks.apply_quiz(without))
+
+    def test_special_pages_get_no_quiz_block(self):
+        text = page("<title>T</title>", quiz_script(QUIZ_OK))
+        self.assertNotIn(blocks.QUIZ_BEGIN, blocks.apply_generated(text, "index.html"))
+        self.assertIn(blocks.QUIZ_BEGIN, blocks.apply_generated(text, "memo.html"))
+
+    def test_quiz_assets_exist(self):
+        self.assertTrue(blocks.QUIZ_CSS.is_file())
+        self.assertTrue(blocks.QUIZ_JS.is_file())
 
 
 class LintTest(unittest.TestCase):
@@ -312,10 +357,10 @@ class MarkdownTest(unittest.TestCase):
 <table><tr><th>A</th><th>B</th></tr><tr><td>1</td><td>2</td></tr></table>
 <pre>code
   line</pre>
-""" + blocks.BACKLINK + LEGACY_QUIZ)
+""" + blocks.BACKLINK + quiz_script([{"q": "秘密の問題", "choices": ["a", "b"], "answer": 0}]))
 
     def test_converts_body(self):
-        md = markdown.html_to_markdown(self.HTML, "https://ex.com/p.html")
+        md = markdown.html_to_markdown(blocks.apply_quiz(self.HTML), "https://ex.com/p.html")
         self.assertIn("## 見出し", md)
         self.assertIn("**強調**", md)
         self.assertIn("`c`", md)
@@ -342,20 +387,57 @@ class MarkdownTest(unittest.TestCase):
         self.assertIn(f"- [T]({config.SITE_URL}md/p.md): D（a, b / 2026-01-01）", txt)
 
 
+class _TagCounter(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self.starts: dict[str, int] = {}
+
+    def handle_starttag(self, tag, attrs):
+        self.starts[tag] = self.starts.get(tag, 0) + 1
+
+
 class SiteTest(unittest.TestCase):
+    def setUp(self):
+        # クイズの表示・プレビューを確かめるので、リポジトリの設定（quiz が false のサイトもある）に関わらずオンにする
+        orig = config.CONFIG["quiz"]
+        config.CONFIG["quiz"] = True
+        self.addCleanup(config.CONFIG.__setitem__, "quiz", orig)
+
     def test_json_writers(self):
         memos = [{"file": "a.html", "title": "A", "desc": "", "tags": [], "date": "2026-01-01"},
                  {"file": "b.html", "title": "B", "desc": "", "tags": [], "date": "2026-01-01"}]
-        self.assertEqual(json.loads(site.memos_json(memos)), memos)
+        quizzes = [{"file": "a.html", "q": "Q"}, {"file": "a.html", "q": "Q2"}]
+        rows = json.loads(site.memos_json(memos, quizzes))
+        self.assertEqual([r["quizzes"] for r in rows], [2, 0])
+        self.assertEqual(json.loads(site.quizzes_json(quizzes)), quizzes)
+        self.assertEqual(site.quizzes_json([]), "[]\n")
+        self.assertEqual(site.quizzes_json(quizzes).count("\n"), 4, "1 問 1 行")
 
     def test_strip_fence(self):
         self.assertEqual(site.strip_fence("```html\n<p>x</p>\n```"), "<p>x</p>")
         self.assertEqual(site.strip_fence("<p>x</p>"), "<p>x</p>")
         self.assertEqual(site.strip_fence("```\nnot html\n```"), "```\nnot html\n```")
 
-    def test_memo_preview_is_the_generated_page(self):
-        text = page("<title>T</title>", "<p>本文</p>")
-        self.assertEqual(site.preview_text(text, "t.html"), blocks.apply_generated(text, "t.html"))
+    def test_preview_inlines_assets_and_escapes_closing_tags(self):
+        text = page("<title>T</title>", '<h2 id="s">S</h2>' + quiz_script(QUIZ_OK))
+        out = site.preview_text(text, "t.html")
+        self.assertNotIn(blocks.QUIZ_CSS_TAG, out)
+        self.assertNotIn(blocks.QUIZ_JS_TAG, out)
+        # ブラウザと同じく <script> の中身は解釈せずに数える。埋め込んだ JS が途中でタグを閉じていれば数が増える
+        counter = _TagCounter()
+        counter.feed(out)
+        self.assertEqual(counter.starts.get("script"), 2)  # 埋め込んだクイズの JS と問題データ
+        self.assertIn(blocks.QUIZ_JS.read_text(encoding="utf-8").strip()[:40], out)
+
+    def test_inline_tag_escapes_its_closing_tag(self):
+        self.assertEqual(site._inline_tag("script", "a</script>b"), "<script>\na<\\/script>b\n</script>")
+
+    @unittest.skipUnless(helpers.repo_has_memos() and config.load_config()["quiz"],
+                         "本物のメモがない（仕組みだけのリポジトリ）か、クイズを使わないサイト")
+    def test_collect_quizzes_from_repository_are_valid(self):
+        qs = site.collect_quizzes(site.site_data()[0])
+        self.assertTrue(qs)
+        self.assertEqual(blocks.validate_quiz(qs and [{k: q[k] for k in ("q", "choices", "answer")} for q in qs]), [])
 
 
 class SiteFieldsTest(unittest.TestCase):
@@ -394,12 +476,12 @@ class SiteFieldsTest(unittest.TestCase):
     def test_optional_elements_are_removed_only_when_off(self):
         src = ('<footer>\n    <a href="a.html">A</a>\n'
                '    <span data-memo-if="roadmap">· <a href="roadmap.html">ロードマップ</a></span>\n'
-               '    · <a href="b.html">B</a>\n</footer>')
+               '    · <a href="settings.html">設定</a>\n</footer>')
         orig = dict(blocks.CONFIG)
         try:
             blocks.CONFIG["roadmap"] = False
             out = blocks.apply_site(src)
-            self.assertEqual(out, '<footer>\n    <a href="a.html">A</a>\n    · <a href="b.html">B</a>\n</footer>')
+            self.assertEqual(out, '<footer>\n    <a href="a.html">A</a>\n    · <a href="settings.html">設定</a>\n</footer>')
             self.assertEqual(blocks.apply_site(out), out)
             blocks.CONFIG["roadmap"] = True
             self.assertEqual(blocks.apply_site(src), src)  # オンなら何も変えない

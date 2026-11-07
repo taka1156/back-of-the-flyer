@@ -198,7 +198,7 @@ const ROADMAP = [
 
 // このページ自身や特別なページは「ロードマップ外」に出さない
 const SELF = (location.pathname.split('/').pop() || 'roadmap.html');
-const IGNORE = new Set(['roadmap.html', SELF, 'index.html']);
+const IGNORE = new Set(['roadmap.html', SELF, 'index.html', 'quiz.html', 'settings.html']);
 const PRIO_LABEL = { high: '高', mid: '中', low: '低' };
 
 // ── 一覧データの読み込み ───────────────────────────

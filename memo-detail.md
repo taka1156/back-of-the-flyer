@@ -1,10 +1,10 @@
 # memo.py の仕組み
 
-`scripts/memo.py` は、MEMO リポジトリのメモ（原本は `src/*.html`）を登録・点検し、公開用のサイト一式（自動生成ブロック入りのページ・一覧・AI 向けの Markdown 版）を `dist/` に書き出すツールです。
+`scripts/memo.py` は、MEMO リポジトリのメモ（`src/*.html`）を登録・点検し、公開用のサイト一式（一覧や AI 向けの Markdown 版を含む）を `dist/` に生成するツールです。
 入口は `scripts/memo.py`、処理の本体は `scripts/memolib/` にあり、テストは `tests/` にあります。
 標準ライブラリだけで動き、どのディレクトリから実行してもかまいません。
 
-使い方の入口は [README](README.md)、ページのデザイン規約は [memo-style](.claude/skills/memo-style/SKILL.md)、登録の手順は [memo-publish](.claude/skills/memo-publish/SKILL.md) にあります。このファイルは「スクリプトが何をどこに書くか」の説明です。
+使い方の入口は [README](README.md)、ページのデザイン規約とクイズの書き方は [memo-style](.claude/skills/memo-style/SKILL.md)、登録の手順は [memo-publish](.claude/skills/memo-publish/SKILL.md) にあります。このファイルは「スクリプトが何をどこに書くか」の説明です。
 
 ## 目次
 
@@ -15,8 +15,10 @@
 - [登録の流れ](#登録の流れ)
 - [各コマンドの詳細](#各コマンドの詳細)
 - [自動生成ブロック](#自動生成ブロック)
+- [確認クイズのデータの流れ](#確認クイズのデータの流れ)
 - [AI 向けの Markdown 版](#ai-向けの-markdown-版)
 - [サイトごとの設定（memo.config.json）](#サイトごとの設定memoconfigjson)
+  - [ロードマップ（オプション）](#ロードマップオプション)
 - [日付と URL の決まり方](#日付と-url-の決まり方)
 - [表示の確認とプレビュー](#表示の確認とプレビュー)
 - [GitHub Actions](#github-actions)
@@ -26,8 +28,9 @@
 
 ## 基本の考え方
 
-- **原本は人（または Claude）が書く。それ以外はすべて生成する。** 原本は各メモの本文と `<head>` のメタ情報の 2 つだけで、一覧や Markdown 版、各ページに差し込むタグはスクリプトが作ります。生成されたものは手で編集しません（次の `build` で上書きされます）。
-- **原本と生成物は置き場所ごと分ける。** `src/` には原本だけを置き（自動生成ブロックも一覧データもないので、表示の確認は `build` して `dist/` で行う）、`build` は `src/` を読むだけで書き換えません。生成物はすべて `dist/`（`.gitignore` 済み）に書き出し、GitHub Actions がその中身を **dist ブランチ**にコミットします。原本のブランチ（`master`）に生成物や Actions のコミットは入りません。
+- **原本は人（または Claude）が書く。それ以外はすべて生成する。** 原本は各メモの本文・`<head>` のメタ情報・クイズの問題データの 3 つだけで、一覧や Markdown 版、各ページに差し込むタグはスクリプトが作ります。生成されたものは手で編集しません（次の `build` で上書きされます）。
+- **原本と生成物は置き場所ごと分ける。** `src/` には原本だけを置き（単体で開いて見るものではない。自動生成ブロックも一覧データもないので、表示の確認は `build` して `dist/` で行う）、`build` は `src/` を読むだけで書き換えません。生成物はすべて `dist/`（`.gitignore` 済み）に書き出し、GitHub Actions がその中身を **dist ブランチ**にコミットします。原本のブランチ（`main`）に生成物や Actions のコミットは入りません。
+- **同じものを 2 か所に書かない。** クイズの表示（CSS / JS）は `src/assets/memo-quiz.*` に 1 つだけ置き、各メモは参照するだけです。
 - **サイトごとの値は `memo.config.json` だけに書く。** サイト名・リポジトリ・ブランチ・タイムゾーンをコードやスキル、ページに直接書きません（[サイトごとの設定](#サイトごとの設定memoconfigjson)）。
 - **置き場所を知っているのはスクリプトだけ。** メモは名前（`docker` など）で指定し、パスは `memo.py path NAME` で引きます。スキル側でパスを組み立てません。
 - **公開されるのは `dist/` の中身だけ。** GitHub Pages の公開元は dist ブランチ（`dist/` の中身そのもの）なので、スクリプト・スキル・このファイルは公開されません。
@@ -36,10 +39,11 @@
 
 ```mermaid
 flowchart LR
-  subgraph SRC["master ブランチ・src/（原本。手で書く）"]
+  subgraph SRC["main ブランチ・src/（原本。手で書く）"]
     direction TB
-    H["src/NAME.html<br/>本文・メタ情報"]
-    PG["src/index.html・settings.html・roadmap.html"]
+    H["src/NAME.html<br/>本文・メタ情報・問題データ"]
+    PG["src/index.html・quiz.html・settings.html・roadmap.html"]
+    CSS["src/assets/memo-quiz.css・.js"]
     IMG["src/assets/*.png・favicon.ico<br/>（branding/ から生成）"]
     CFG["memo.config.json<br/>サイト名・リポジトリ・ブランチ"]
   end
@@ -48,8 +52,8 @@ flowchart LR
 
   subgraph GEN["dist/（生成物。コミットしない）"]
     direction TB
-    MEMO["NAME.html・index.html など<br/>memo:head を差し込んだページ"]
-    MJ["memos.json"]
+    MEMO["NAME.html・index.html など<br/>memo:head / memo:quiz を差し込んだページ"]
+    MJ["memos.json・quizzes.json"]
     MD["md/NAME.md・llms.txt"]
     ENT["entry-skill/SKILL.md"]
     CP["assets/・CNAME・.nojekyll<br/>（src/ のコピー）"]
@@ -58,24 +62,27 @@ flowchart LR
   A(["GitHub Actions<br/>Deploy MEMO"])
   S["dist ブランチ<br/>→ GitHub Pages"]
 
-  H & PG & IMG & CFG --> B
+  H & PG & CSS & IMG & CFG --> B
   B --> MEMO & MJ & MD & ENT & CP
   GEN --> A --> S
 ```
 
 | ファイル | 種類 | 作る人 | 中身 |
 | --- | --- | --- | --- |
-| `src/NAME.html` | メモ（原本） | 人 | 本文とメタ情報。自動生成ブロックは入れない（`build` が `dist/` のページにだけ入れる） |
-| `src/index.html` | トップページ（原本） | 人 | 一覧・検索・タグ絞り込み。データは `memos.json` から読む。サイト名・説明・リポジトリへのリンクは `build` が `memo.config.json` から入れる |
+| `src/NAME.html` | メモ（原本） | 人 | 本文とメタ情報と問題データ。自動生成ブロックは入れない（`build` が `dist/` のページにだけ入れる） |
+| `src/index.html` | トップページ（原本） | 人 | 一覧・検索・タグ絞り込み・ランダムクイズ。データは JSON から読む。サイト名・説明・リポジトリへのリンクは `build` が `memo.config.json` から入れる |
+| `src/quiz.html` | クイズページ（原本） | 人 | ランダム 10 問・カテゴリ別 10 問と、タイムアタック（制限時間内に何問正解できるか。ランダムかカテゴリ別）。カテゴリは複数選べ、どれかに入る問題から出す。データは JSON から読む。サイト名は `build` が入れる |
 | `src/settings.html` | 設定ページ（原本） | 人 | アクセント色を試し、Actions で固定する手順へ進む（トップページのフッターの「設定」から開く。[設定ページからアクセント色を変える](#設定ページからアクセント色を変える)）。今の色・サイト名・Actions へのリンクは `build` が入れる |
-| `src/roadmap.html` | ロードマップ（原本・オプション） | 人 | 書いたメモと、これから書くテーマを分野ごとに並べたチェックリスト。`memo.config.json` の `roadmap` が `true` のときだけ公開し、トップページのフッターの「ロードマップ」から開く（[ロードマップ（オプション）](#ロードマップオプション)） |
-| `memo.config.json` | 設定 | 人（アクセント色は `memo.py accent` でも） | サイト名・説明・リポジトリ・ブランチ・デプロイ先のブランチ・タイムゾーン・ロードマップ・アクセント色とアイコン/OGP 画像の文字 |
-| `dist/NAME.html` など | 生成物 | `build` | 原本に `memo:head` ブロックとサイト設定を差し込んだ公開用のページ |
+| `src/roadmap.html` | ロードマップ（原本・オプション） | 人 | 書いたメモと、これから書くテーマを分野ごとに並べたチェックリスト。`memo.config.json` の `roadmap` が `true` のときだけ公開し、トップページのフッターの「ロードマップ」から開く（[ロードマップ（オプション）](#ロードマップオプション)）。項目はページのスクリプト冒頭の `ROADMAP` に書き、`memos.json` に項目のファイル名（`file` か別名の `alt`）があれば自動でチェックが付く。どの項目にも当てはまらないメモは「ロードマップ外のメモ」に並ぶ。サイト名は `build` が入れる |
+| `memo.config.json` | 設定 | 人（アクセント色は `memo.py accent` でも） | サイト名・説明・リポジトリ・ブランチ・デプロイ先のブランチ・タイムゾーン・アクセント色とアイコン/OGP 画像の文字 |
+| `dist/NAME.html` など | 生成物 | `build` | 原本に `memo:head`・`memo:quiz` ブロックとサイト設定を差し込んだ公開用のページ |
 | `dist/entry-skill/SKILL.md` | 生成物 | `build` | claude.ai のアプリ側に置く入口スキル（リポジトリ名とブランチ入り） |
-| `dist/memos.json` | 生成物 | `build` | 全メモのタイトル・説明・タグ・日付 |
+| `dist/memos.json` | 生成物 | `build` | 全メモのタイトル・説明・タグ・日付・問題数 |
+| `dist/quizzes.json` | 生成物 | `build` | 全メモの問題（どのメモの問題かも含む）。1 問 1 行 |
 | `dist/md/NAME.md` | 生成物 | `build` | 各メモの本文を Markdown にしたもの |
 | `dist/llms.txt` | 生成物 | `build` | 全メモの目次（Markdown 版へのリンク） |
 | `dist/assets/`・`CNAME`・`.nojekyll` | 生成物（コピー） | `build` | `src/` のページ以外のファイルをそのままコピーしたもの |
+| `src/assets/memo-quiz.css`・`.js` | 共通ファイル | 人 | 確認クイズの見た目と動き |
 | `src/assets/*.png`・`favicon.ico` | 共通ファイル | `branding/render.py` | アイコンと OGP 画像 |
 | `.claude/skills/memo-style/template.html` | テンプレート | 人 | `new` で新しいメモを作るときの雛形 |
 
@@ -94,8 +101,10 @@ flowchart LR
   subgraph BODY["&lt;body&gt;"]
     direction TB
     b1["本文・図解・タブなど"]
-    b2["フッター「← 一覧に戻る」<br/>（lint --backlink が追加）"]
-    b1 ~~~ b2
+    b2["&lt;!-- memo:quiz --&gt; ブロック<br/>クイズ表示の枠＋共通 CSS / JS への参照（dist/ のページにだけ build が入れる）"]
+    b3["フッター「← 一覧に戻る」<br/>（lint --backlink が追加）"]
+    b4["問題データ<br/>&lt;script type=&quot;application/json&quot; id=&quot;memo-quiz&quot;&gt;"]
+    b1 ~~~ b2 ~~~ b3 ~~~ b4
   end
   HEAD --> BODY
 ```
@@ -113,6 +122,14 @@ flowchart LR
 - タグはカンマ区切り。表記ゆれを防ぐため、既存のタグ（`memo.py list` で見られる）を使い回します。
 - 日付の決まり方は[日付と URL の決まり方](#日付と-url-の決まり方)を参照。
 
+問題データの書式と作問ルールは [memo-style の「確認クイズ」](.claude/skills/memo-style/SKILL.md) にあります。
+
+```html
+<script type="application/json" id="memo-quiz">
+[{"q": "問題文", "choices": ["A", "B", "C"], "answer": 0, "explain": "解説", "ref": "#見出しのid"}]
+</script>
+```
+
 ## コマンド一覧
 
 ```bash
@@ -126,14 +143,15 @@ python3 scripts/memo.py <コマンド> ...
 | `path` | `path NAME [--md]` | メモ（または Markdown 版）の絶対パスを表示 | しない |
 | `url` | `url [NAME]` | 公開 URL を表示 | しない |
 | `lint` | `lint MEMO... [--fix] [--backlink]` | 崩れのチェック。`--fix` で直せるものを直す | `--fix` のときだけ |
-| `meta` | `meta MEMO [--title] [--desc] [--tags] [--date]` | メタ情報を設定する | する |
-| `build` | `build [--check]` | `src/` から公開用のサイト一式を `dist/` に書き出す。`--check` は古いかどうかだけ調べる | `src/` はしない（`dist/` に書く） |
-| `accent` | `accent COLOR [LIGHT]` | `memo.config.json` のアクセント色だけを書き換える（`LIGHT` を省くと自動。ページへの反映は `build`） | `memo.config.json` だけ |
+| `meta` | `meta MEMO [--title] [--desc] [--tags] [--date]` | メタ情報を設定する | する（指定した項目だけ） |
+| `build` | `build [--check]` | `src/` から公開用のサイト一式を `dist/` に書き出す。`--check` は `dist/` が古いかどうかだけ調べる | `dist/` だけ（`--check` 以外）。`src/` は書き換えない |
 | `list` | `list` | メモの一覧（日付・名前・タイトル・タグ）を表示 | しない |
-| `preview` | `preview MEMO\|index\|settings\|roadmap\|FILE [-o OUT]` | 自動生成ブロックを入れ、トップページ・ロードマップなら一覧データを埋め込んだ 1 枚の HTML を書き出す | 元のファイルはしない |
+| `config` | `config [KEY]` | `memo.config.json` の設定（と公開 URL `site_url`）を表示 | しない |
+| `accent` | `accent COLOR [LIGHT]` | アクセント色を `memo.config.json` に書く（`LIGHT` を省くと `COLOR` から自動）。ページへの反映は `build`（公開はデプロイ） | `memo.config.json` だけ |
+| `preview` | `preview MEMO\|index\|quiz\|settings\|roadmap\|FILE [-o OUT]` | 共通ファイルを埋め込んだ 1 枚の HTML を書き出す | 元のファイルはしない |
 
 `MEMO` / `NAME` は `docker`・`docker.html`・`src/docker.html` のどれでもよく、既存のファイルパスを渡せばそのファイルが対象になります（下書きの点検に使えます）。
-名前は英小文字・数字・ハイフンだけで、`index`・`settings`・`roadmap` は特別なページなのでメモ名に使えません。
+名前は英小文字・数字・ハイフンだけで、`index`・`quiz`・`settings`・`roadmap` は特別なページなのでメモ名に使えません。
 
 ## 登録の流れ
 
@@ -153,7 +171,7 @@ sequenceDiagram
   P->>D: src/NAME.html を作る（コードブロックの囲いは外す）
   U->>P: lint NAME --fix --backlink
   P->>D: 崩れを直し、フッターを入れる（自動生成ブロックがあれば取り除く）
-  P-->>U: 直せない問題（メタ情報の欠落など）を報告
+  P-->>U: 直せない問題（メタ情報の欠落・クイズの誤り）を報告
   U->>P: meta NAME --title --desc --tags --date
   P->>D: メタ情報を書く
   U->>P: build
@@ -161,7 +179,7 @@ sequenceDiagram
   U->>G: src/ の原本だけを commit / push
   G->>A: src/ などの変更で起動（Deploy MEMO）
   A->>A: lint（報告のみ）→ build で dist/ を作る
-  A->>G: dist/ の中身を dist ブランチにコミット（master には何もコミットしない）
+  A->>G: dist/ の中身を dist ブランチにコミット（main には何もコミットしない）
   G->>S: dist ブランチを公開
 ```
 
@@ -185,11 +203,11 @@ GitHub の画面から HTML を直接アップロードした場合も、Actions
 | 直す | `* {` が `- {` や `\*` に化けたもの（Markdown 経由のコピペで起きる） |
 | 直す | `<!DOCTYPE html>`・charset・viewport の欠落 |
 | 直す | フッターの「← 一覧に戻る」リンク（`--backlink` のとき。無ければ追加） |
-| 直す | `memo:head` ブロック（アイコン・OGP）の追加／更新 |
-| 直す | 原本に入っている `memo:head` ブロックの削除（古い形のページや、公開ページからコピーした HTML。ブロックは `build` が `dist/` にだけ入れる）と、廃止した確認クイズの名残（`memo:quiz` ブロックと `id="memo-quiz"` の問題データ）の削除 |
+| 直す | 原本に入っている `memo:head`・`memo:quiz` ブロックの削除（古い形のページや、公開ページからコピーした HTML。ブロックは `build` が `dist/` にだけ入れる） |
 | 報告 | JS 内で全角クォートが文字列の区切りに使われている疑い |
 | 報告 | タイトル・説明・タグ・日付の欠落 |
 | 報告 | 一覧へのリンクが無い（`--backlink` を付けていないとき） |
+| 報告 | クイズの JSON の崩れ・形の誤り・`ref` の飛び先が無い・正解の位置が全問同じ |
 
 終了コードは、報告が残るか、`--fix` なしで直せるものがあれば 1、それ以外は 0 です。
 
@@ -207,8 +225,8 @@ GitHub の画面から HTML を直接アップロードした場合も、Actions
 ```mermaid
 flowchart TB
   s1["① src/ のページ以外のファイルをコピーする<br/>assets/・CNAME・.nojekyll など"]
-  s2["② 各ページに自動生成ブロックを入れる<br/>メモ: memo:head（旧クイズは取り除く）/ index・settings・roadmap: memo:head とサイト名など<br/>オプションのページ（roadmap）はオンのときだけ"]
-  s3["③ 全メモの &lt;head&gt; から memos.json を作る<br/>日付の新しい順"]
+  s2["② 各ページに自動生成ブロックを入れる<br/>メモ: memo:head・memo:quiz / index・quiz・settings・roadmap: memo:head とサイト名など"]
+  s3["③ 全メモの &lt;head&gt; と問題データから<br/>memos.json・quizzes.json を作る（日付の新しい順。崩れた問題は飛ばして警告）"]
   s4["④ md/*.md と llms.txt を作る"]
   s5["⑤ entry-skill/SKILL.md を作る"]
   s6["⑥ dist/ をこの中身にそろえる<br/>消えたメモ・ファイルは dist/ からも消す"]
@@ -218,6 +236,7 @@ flowchart TB
 - `memo.config.json` の `repository` が空・`owner/name` の形でない・テンプレートの値（`repo/sample`）のままのときは、最初に警告を出します（止めずに続けます）。入口スキルの clone 先や公開 URL がおかしくなるのを防ぐためです。
 - `--check` は何も書き込まず、`dist/` に古い（足りない・余分な）ファイルがあれば名前を表示して終了コード 1 を返します。
 - `dist/` を消して `build` し直しても同じ中身になります。`dist/` は `.gitignore` 済みで、コミットするのは `src/` の原本だけです。
+- `memos.json` の各メモには、そのメモの問題数（`quizzes`）も入ります。トップページはこれを足してランダムクイズの問題数を表示し、問題本体（`quizzes.json`）はランダムクイズを開いたときに初めて読み込みます。
 
 ### list / path / url
 
@@ -227,29 +246,58 @@ flowchart TB
 
 ### preview
 
-トップページとロードマップは一覧データ（`memos.json`）を読み込むので、HTML 1 枚だけを渡す場面（会話内のプレビューなど）では一覧が出ません。`preview` は自動生成ブロックを入れ、トップページ・ロードマップならデータを埋め込んだコピーを書き出します。元のファイルは変更しません。
+公開するページは共通ファイル（クイズの CSS / JS、一覧の JSON）を読み込むので、HTML 1 枚だけを渡す場面（会話内のプレビューなど）では動きません。`preview` はそれらを埋め込んだコピーを書き出します。元のファイルは変更しません。
 
 ```mermaid
 flowchart LR
-  in["メモ名・index・roadmap<br/>または下書きの HTML"] --> g["自動生成ブロックを最新にする"]
-  g --> d{"index / roadmap？"}
-  d -- はい --> e["window.MEMO_DATA に<br/>memos.json の中身を埋め込む"]
+  in["メモ名・index・quiz<br/>または下書きの HTML"] --> g["自動生成ブロックを最新にする"]
+  g --> c["&lt;link href=&quot;assets/memo-quiz.css&quot;&gt;<br/>→ &lt;style&gt; に中身を埋め込む"]
+  c --> j["&lt;script src=&quot;assets/memo-quiz.js&quot;&gt;<br/>→ &lt;script&gt; に中身を埋め込む"]
+  j --> d{"index / quiz？"}
+  d -- はい --> e["window.MEMO_DATA に<br/>memos.json・quizzes.json の中身を埋め込む"]
   d -- いいえ --> o
   e --> o["-o の場所に書き出す<br/>（省略時は一時フォルダの memo-preview/）"]
 ```
 
-トップページとロードマップは、`window.MEMO_DATA` があればそれを使い、無ければ `memos.json` を fetch します。
+埋め込む中身は公開版と同じファイルから取るので、見た目と動きは公開版と変わりません。トップページとクイズページは、`window.MEMO_DATA` があればそれを使い、無ければ JSON を fetch します。
 
 ## 自動生成ブロック
 
-`build`（と `preview`）が `dist/` のページに差し込むブロックです。原本（`src/`）には入れません。開始と終了のコメントで囲まれていて、毎回まるごと作り直されるので、中を手で編集しても消えます。
+`build`（と `preview`）が `dist/` のページに差し込むブロックです。原本（`src/`）には入りません。開始と終了のコメントで囲まれていて、毎回まるごと作り直されます。
 
 | ブロック | 入る場所 | 中身 | 作るもの |
 | --- | --- | --- | --- |
-| `<!-- memo:head -->` 〜 `<!-- /memo:head -->` | `</head>` の直前 | ファビコン・iOS アイコン・OGP（`og:title` / `og:description` は title / description から）、アクセント色（`branding.accent`・`accent_light`） | `build`・`preview`（原本に入っていたら `lint --fix` が取り除く） |
-| `data-memo-site` の付いた要素・属性 | `index.html`・`settings.html`・`roadmap.html` の書いた場所 | `memo.config.json` の値（[サイトごとの設定](#サイトごとの設定memoconfigjson)）。目印の属性は残る | `build`・`preview` |
-| `data-memo-if` の付いた要素 | `index.html` の書いた場所 | 設定の項目（`roadmap`）がオフなら要素ごと取り除く。オンならそのまま | `build`・`preview` |
-| `<footer id="memo-backlink">` | `</body>` の直前 | 「← 一覧に戻る」リンク。スタイルはインラインで完結 | `lint --backlink`（無いときだけ追加） |
+| `<!-- memo:head -->` 〜 `<!-- /memo:head -->` | `</head>` の直前 | ファビコン・iOS アイコン・OGP（`og:title` / `og:description` は title / description から）、アクセント色（`branding.accent`・`accent_light`） | `build`・`preview` |
+| `<!-- memo:quiz -->` 〜 `<!-- /memo:quiz -->` | フッターの直前（無ければ `</body>` の直前） | クイズ表示の枠と、`assets/memo-quiz.css`・`.js` への参照。問題データが無いメモには入らない | `build`・`preview` |
+| `data-memo-site` の付いた要素・属性 | `index.html`・`quiz.html`・`settings.html`・`roadmap.html` の書いた場所 | `memo.config.json` の値（[サイトごとの設定](#サイトごとの設定memoconfigjson)）。目印の属性は残る | `build`・`preview` |
+| `data-memo-if` の付いた要素 | `index.html` の書いた場所 | 設定の項目（`quiz`・`roadmap`）がオフなら要素ごと取り除く。オンならそのまま | `build`・`preview` |
+| `<footer id="memo-backlink">` | `</body>` の直前 | 「← 一覧に戻る」リンク。スタイルはインラインで完結。これだけは原本に入る | `lint --backlink`（無いときだけ追加） |
+
+## 確認クイズのデータの流れ
+
+問題の原本は各メモの中にだけあり、ほかはすべてそこから作られます。
+
+```mermaid
+flowchart LR
+  subgraph memo["dist/NAME.html"]
+    data["問題データ（src/NAME.html の原本から）<br/>id=&quot;memo-quiz&quot;"]
+    ui["memo:quiz ブロック"]
+  end
+  js["assets/memo-quiz.js"]
+  qj["dist/quizzes.json"]
+  data -- "ページ内で読む" --> js
+  js -- "描画" --> ui
+  data -- "build が集める" --> qj
+  qj -- "fetch" --> idx["index.html<br/>ランダムクイズ"]
+  qj -- "fetch" --> qp["quiz.html<br/>10 問クイズ・タイムアタック"]
+  idx -- "メモを開く（ref）" --> memo
+  qp -- "メモを開く（ref）" --> memo
+```
+
+- `ref`（`"#見出しのid"`）があると、間違えたときに本文の該当箇所へのリンクが出ます。飛び先が閉じたタブや `<details>` の中にあれば、`memo-quiz.js` が開いてから移動します。
+- `quiz.html` のタイムアタックは、条件（ランダムかカテゴリ）に合う全問をシャッフルして、制限時間（30 秒／1 分／3 分）が切れるか問題が尽きるまで出します。答えるとすぐ次の問題に進み（正誤・解説は出さない）、結果で全問の正解と解説をまとめて見せます。残り時間はバーと秒数で表示し、条件ごとの自己ベストはブラウザ（localStorage）に保存します。カテゴリは 10 問モードと同じく複数選べます。URL は `quiz.html?mode=timeattack&time=60&tag=…&tag=…`（カテゴリごとに `tag` を並べる。10 問モードは `quiz.html?tag=…&tag=…`）で、直接開いてもはじめられます。
+- `memo.config.json` の `quiz` を `false` にすると、上の図のうち `memo:quiz` ブロック・`quizzes.json`・`quiz.html`・トップのランダムクイズをどれも作りません（[サイトごとの設定](#サイトごとの設定memoconfigjson)）。
+- 問題を直すときは各メモの問題データだけを直し、`build` で `quizzes.json` に反映します。
 
 ## AI 向けの Markdown 版
 
@@ -262,7 +310,7 @@ flowchart LR
 
 変換のルール:
 
-- `<head>`・CSS・JS・フッターは除きます。
+- `<head>`・CSS・JS・クイズの表示ブロック・フッターは除きます。問題データは本文に含めません。
 - SVG の図は、中の文字（ラベル）だけを残します。
 - 図や操作できるパーツがある節には、元のページのその節へのリンクを付けます。
 - 本文の大半を JavaScript のデータから描画するページは、HTML からは中身が取れないので、そのスクリプトをコードブロックとして末尾に付けます。
@@ -276,15 +324,16 @@ flowchart LR
 
 | 項目 | 使われる場所 | 既定値 |
 | --- | --- | --- |
-| `site_name` | 各ページの OGP・iOS アイコン名、トップページの `<title>`・見出し、`llms.txt` の見出し、入口スキルの説明、アイコン・OGP 画像の文字 | `MEMO` |
+| `site_name` | 各ページの OGP・iOS アイコン名、トップとクイズのページの `<title>`・見出し、`llms.txt` の見出し、入口スキルの説明、アイコン・OGP 画像の文字 | `MEMO` |
 | `description` | トップページの説明（本文と `<meta name="description">`、OGP）、OGP 画像の説明文 | 空 |
 | `llms_description` | `llms.txt` の冒頭の説明（空なら書かない） | 空 |
 | `repository` | トップページのリンク、`src/CNAME` が無いときの公開 URL、入口スキル（clone 先・スキル名） | 空（`build` が警告） |
-| `branch` | スキルの push 先（`python3 scripts/memo.py config branch` で読む）、入口スキルの raw URL | `main` |
-| `deploy_branch` | `build` の出力（`dist/`）をデプロイするブランチ。GitHub Pages の公開元にする。`branch` と同じにはできない | `dist` |
+| `branch` | 原本のブランチ。スキルの push 先（`python3 scripts/memo.py config branch` で読む）、入口スキルの raw URL | `main` |
+| `deploy_branch` | `build` の出力（`dist/`）をデプロイするブランチ。GitHub Pages の公開元にする（Deploy MEMO が `config deploy_branch` で読む）。`branch` と同じにはできない | `dist` |
 | `utc_offset_hours` | `meta --date` の「今日」 | `0`（日本なら `9`） |
-| `roadmap` | ロードマップ（`src/roadmap.html`）を公開して、トップページからリンクするか（`true` / `false`。[ロードマップ（オプション）](#ロードマップオプション)） | `false` |
 | `branding` | 全ページのアクセント色（`memo:head` に入る）と、アイコン・OGP 画像（`branding/render.py`）。下の表 | `{}` |
+| `quiz` | 確認クイズを使うか。`false` なら `build` が `quiz.html`・`quizzes.json`・クイズの共通 CSS / JS（`assets/memo-quiz.*`）を `dist/` に出さず、各メモにクイズの表示（`memo:quiz` ブロック）を入れず、トップページのランダムクイズ（`data-memo-if="quiz"`）を取り除く。`memos.json` の問題数は 0 になる。原本の問題データは残るので、`true` に戻して `build` すれば元どおり出る。スキルも新しいメモにクイズを書かなくなる | `true` |
+| `roadmap` | ロードマップ（`src/roadmap.html`）を公開して、トップページからリンクするか。`true` か `false`（[ロードマップ（オプション）](#ロードマップオプション)） | `false` |
 
 `branding` の中の項目（空欄はほかの設定から埋まります）:
 
@@ -294,19 +343,20 @@ flowchart LR
 | `tagline` | OGP 画像の説明文（2 行まで） | `description` |
 | `url` | OGP 画像に小さく出す URL | 公開 URL のホスト名とパス |
 | `mark` | アイコンの文字（1〜2 文字がおすすめ） | `title` の先頭 1 文字 |
+| `icon` | アイコンの絵柄。`mark`（紙に `mark` の文字）か `lines`（文字なし。小さいアイコンは横線 3 本） | `mark` |
 | `accent` | ダークモードのページの `--accent`（見出し・強調・リンク）と、`theme: dark` の画像の色（題字・余白線・ペン）。`#rgb` か `#rrggbb` | 空にはできない（既定 `#00d4ff`） |
 | `accent_light` | ライトモードのページの `--accent` と、`theme: light` の画像の色 | `accent` を白地とのコントラスト比 4.5 以上になるまで暗くした色 |
 | `theme` | 画像のテーマ。`dark` か `light`（ページはライト・ダークの両方に自動で対応） | `dark` |
 
-- 書き間違い（JSON の書式、文字列であるべき項目に数値、`roadmap` が true / false でない、`site_name`・`branch` が空、`deploy_branch` が `branch` と同じ、`utc_offset_hours` が -24〜24 の外など）は、項目名と直し方を示して止まります（traceback は出しません）。
-- 書かなかった項目は既定値（`scripts/memolib/config.py` の `DEFAULTS`・`BRANDING_DEFAULTS`）になります。知らない項目や、`accent`・`accent_light`・`theme` のおかしな値があるとエラーで止まります（綴りの間違いに気づけるように）。
-- アクセント色は `build` が全ページの `memo:head` に `<style id="memo-accent">` として入れます。各ページの `:root` の `--accent` より強い `html:root` で書くので、ページ側の値（テンプレートの既定値）は上書きされます。
-- `branding` を変えても `build` だけでは画像は変わりません。`python3 branding/render.py` で作り直します（[日付と URL の決まり方](#日付と-url-の決まり方) の「URL」）。
+- 書き間違い（JSON の書式、文字列であるべき項目に数値、`site_name`・`branch`・`deploy_branch` が空、`deploy_branch` が `branch` と同じ、`utc_offset_hours` が -24〜24 の外、`quiz`・`roadmap` が true/false 以外など）は、項目名と直し方を示して止まります（traceback は出しません）。
+- 書かなかった項目は既定値（`scripts/memolib/config.py` の `DEFAULTS`・`BRANDING_DEFAULTS`）になります。知らない項目や、`accent`・`accent_light`・`icon`・`theme` のおかしな値があるとエラーで止まります（綴りの間違いに気づけるように）。
+- アクセント色は `build` が `dist/` の全ページの `memo:head` に `<style id="memo-accent">` として入れます。各ページの `:root` の `--accent` より強い `html:root` で書くので、ページ側の値（テンプレートの既定値）は上書きされます。
+- `branding` を変えても `build` だけでは画像は変わりません。`python3 branding/render.py` で作り直します（設定ページから `Set accent color` で固定したときは、Actions が作り直します）（[日付と URL の決まり方](#日付と-url-の決まり方) の「URL」）。
 - `python3 scripts/memo.py config` で今の設定（と公開 URL）を表示できます。
 
-**トップ・設定・ロードマップのページへの差し込み**
+**トップ・クイズ・設定のページへの差し込み**
 
-`src/index.html`・`src/settings.html`・`src/roadmap.html` のサイト名などは手で書かず、目印の属性を付けておくと `build` が設定の値で書き換えて `dist/` に書き出します（原本の値はそのまま）。書式の中では `{site_name}`・`{description}`・`{repository}`・`{branch}`・`{accent}`（ダーク用のアクセント色）・`{accent_light}`（ライト用。自動のときは計算した色）が使えます。
+`src/index.html`・`src/quiz.html`・`src/settings.html`・`src/roadmap.html` のサイト名などは手で書かず、目印の属性を付けておくと `build` が設定の値で書き換えて `dist/` に書き出します（原本の値はそのまま。表示されるのは `dist/` 側の値）。書式の中では `{site_name}`・`{description}`・`{repository}`・`{branch}`・`{accent}`（ダーク用のアクセント色）・`{accent_light}`（ライト用。自動のときは計算した色）が使えます。
 
 ```html
 <h1 data-memo-site="{site_name}">MEMO</h1>                       <!-- 中身のテキストを置き換える -->
@@ -347,6 +397,7 @@ claude.ai のアプリに置く入口スキルは「このリポジトリを取�
 `src/roadmap.html` は、書いたメモとこれから書くテーマを分野ごとに並べたチェックリストです。必ず要るものではないので、既定ではオフです。`memo.config.json` に `"roadmap": true` を書いて `build` すると公開され、トップページのフッターに「ロードマップ」のリンクが出ます。
 
 - 項目はページのスクリプト冒頭の `ROADMAP` に書きます。書いたメモは `file` だけ、これから書くテーマは `title`・`prio`（`high` / `mid` / `low`）・`note` も書きます。別の名前でも済みにしたいときは `alt` にファイル名を並べます。
+- 項目を相談して決める・その順にメモを書く・書いたメモを項目に足す、は [memo-roadmap](.claude/skills/memo-roadmap/SKILL.md) の手順で行います（「次のメモを書いて」など）。
 - チェックは手で付けません。ページが `memos.json` を読み、項目の `file` か `alt` があれば済みにします。どの項目にも当てはまらないメモは「ロードマップ外のメモ」に並びます。
 - オフのときは、`build` が `dist/` に `roadmap.html` を出さず、ほかのページの `data-memo-if="roadmap"` の付いた要素（トップページのリンク）を取り除きます。オンなら何もしません。
 
@@ -379,14 +430,14 @@ flowchart LR
 
 ## 表示の確認とプレビュー
 
-各メモは 1 枚で完結していますが、トップページとロードマップは `memos.json` を読み込むので、開き方によって表示が変わります。アイコン・OGP・アクセント色は `build` が `dist/` のページにだけ入れます。
+公開ページは共通ファイルを読み込むので、開き方によって表示が変わります。
 
-| 開き方 | 各メモ | トップの一覧 |
-| --- | --- | --- |
-| 公開サイト（GitHub Pages） | 出る | 出る |
-| `build` してからローカルサーバー `python3 -m http.server -d dist` | 出る | 出る |
-| `memo.py preview` で作った 1 枚 | 出る | 出る |
-| 原本（`src/`）の HTML を直接開く・そのまま会話に送る | 出る（アクセント色はテンプレートの既定値） | 「読み込めませんでした」と表示 |
+| 開き方 | 各メモのクイズ | トップの一覧・ランダムクイズ | クイズページ |
+| --- | --- | --- | --- |
+| 公開サイト（GitHub Pages） | 動く | 動く | 動く |
+| `build` してからローカルサーバー `python3 -m http.server -d dist` | 動く | 動く | 動く |
+| `memo.py preview` で作った 1 枚 | 動く | 動く | 動く |
+| HTML ファイルを直接開く・そのまま会話に送る | 出ない | 「読み込めませんでした」と表示 | 「読み込めませんでした」と表示 |
 
 会話内で下書きを見せるときの手順は [memo-style の「会話内でプレビューするとき」](.claude/skills/memo-style/SKILL.md) にあります。
 
@@ -401,7 +452,7 @@ python3 scripts/memo.py preview 下書き.html -o /tmp/NAME.html
 
 ```mermaid
 flowchart LR
-  push["master に push<br/>（原本だけ）"] --> b["Deploy MEMO<br/>lint（報告のみ）→ build"]
+  push["main に push<br/>（原本だけ）"] --> b["Deploy MEMO<br/>lint（報告のみ）→ build"]
   b --> d["dist/"]
   d -->|"中身を丸ごと置き換えてコミット"| br["dist ブランチ"]
   br --> pages["GitHub Pages"]
@@ -415,7 +466,7 @@ flowchart LR
 | 原本のブランチ | 何もコミットしない（以前の `Rebuild MEMO index` のような Actions のコミットは入らない） |
 | 同時実行 | 同じブランチの実行は 1 本ずつ順番に動く（`concurrency`。途中で止めない）。dist ブランチに書くのはこのワークフローだけなので、push の競合は起きない |
 
-もう 1 つの `.github/workflows/test.yml`（`Test memo.py`）は、`scripts/`・`tests/`・トップ・設定・ロードマップのページ・`memo.config.json`・テンプレートが変わったとき（どのブランチでも、PR も含む）にテストを流します。リポジトリは書き換えません。
+もう 1 つの `.github/workflows/test.yml`（`Test memo.py`）は、`scripts/`・`tests/`・クイズの共通ファイル・トップ・クイズ・設定のページ・`memo.config.json`・テンプレートが変わったとき（どのブランチでも、PR も含む）にテストを流します。リポジトリは書き換えません。
 
 ## コードの構成とテスト
 
@@ -430,14 +481,14 @@ flowchart LR
     config["config.py<br/>置き場所・設定の読み込み<br/>URL・日付・ブロックの目印"]
     entry["entry.py<br/>入口スキル"]
     meta["meta.py<br/>メタ情報の読み書き<br/>名前→パス"]
-    blocks["blocks.py<br/>memo:head・フッター<br/>サイト設定の差し込み"]
+    blocks["blocks.py<br/>memo:head・memo:quiz<br/>フッター・問題データ"]
     lint["lint.py<br/>崩れチェック"]
     md["markdown.py<br/>Markdown 版"]
-    site["site.py<br/>memos.json<br/>preview"]
-    dist["dist.py<br/>dist/ を組み立てて書き出す"]
+    site["site.py<br/>memos.json・quizzes.json<br/>preview"]
+    dist["dist.py<br/>dist/ の組み立てと書き出し"]
   end
-  cli --> dist & lint & site & meta & config
-  dist --> entry & md & site & blocks & meta & config
+  cli --> dist & lint & site & meta & md & config
+  dist --> md & site & blocks & entry & meta
   entry --> config
   lint --> blocks
   md --> blocks
@@ -454,22 +505,22 @@ flowchart LR
 | ファイル | 役割 | 主な関数 |
 | --- | --- | --- |
 | `scripts/memo.py` | コマンドの受け付け | `cmd_build`・`cmd_lint`・`cmd_preview` など、`main` |
-| `memolib/config.py` | 置き場所・`memo.config.json` の読み込み・公開 URL・日付・自動生成ブロックの目印 | `load_config`・`today`・`site_url`・`pages_url`・`asset_version` |
+| `memolib/config.py` | 置き場所（原本の `src/`・出力の `dist/`）・`memo.config.json` の読み込み・公開 URL・日付・自動生成ブロックの目印 | `load_config`・`today`・`site_url`・`pages_url`・`asset_version` |
 | `memolib/meta.py` | `<head>` のメタ情報の読み書き、名前からパスへの解決 | `read_meta`・`set_meta`・`memo_path`・`memo_files` |
-| `memolib/blocks.py` | 自動生成ブロック、サイト設定の差し込み、「一覧に戻る」フッター、廃止したクイズの片付け | `head_block`・`apply_site`・`apply_generated`・`strip_generated` |
+| `memolib/blocks.py` | 自動生成ブロック、サイト設定の差し込み、「一覧に戻る」フッター、クイズの問題データ | `head_block`・`apply_site`・`apply_quiz`・`apply_generated`・`strip_generated`・`read_quiz`・`validate_quiz` |
 | `memolib/entry.py` | アプリ側の入口スキルの中身 | `entry_skill` |
 | `memolib/lint.py` | 崩れのチェックと自動修正 | `lint_text` |
 | `memolib/markdown.py` | AI 向けの Markdown 版 | `html_to_markdown`・`memo_markdown`・`llms_txt`・`markdown_outputs` |
-| `memolib/site.py` | 一覧の JSON、会話内プレビュー用の 1 枚の HTML | `site_data`・`memos_json`・`preview_text` |
-| `memolib/dist.py` | `dist/` に置く全ファイルを組み立てて書き出す（`src/` のコピー＋生成物。消えたファイルは消す） | `dist_outputs`・`sync_dist` |
+| `memolib/site.py` | 一覧・問題の JSON、会話内プレビュー用の 1 枚の HTML | `site_data`・`memos_json`・`quizzes_json`・`preview_text` |
+| `memolib/dist.py` | `dist/` に置く全ファイルの組み立て（`src/` のコピー＋生成物）と書き出し | `dist_outputs`・`sync_dist` |
 
-多くの関数は「HTML の文字列を受け取って文字列を返す」だけで、ファイルを書き換えるのは `memo.py` の各コマンドです。そのため関数単位でテストできます。
+多くの関数は「HTML の文字列を受け取って文字列を返す」だけで、ファイルを書き換えるのは `memo.py` の各コマンドと `dist.sync_dist`（`dist/` だけ）です。そのため関数単位でテストできます。
 
 ### テスト
 
 標準ライブラリの `unittest` だけで動きます。一時フォルダに作った「作業用リポジトリ」で動かすので、リポジトリ自体は書き換えません。
 
-ほとんどのテストは、仕組みのファイル（`scripts/`・テンプレート・`src/` の `index.html`・`settings.html`・`roadmap.html`・`.nojekyll`・`assets/`）に `tests/fixtures/` のサンプルのメモ 2 本と設定を組み合わせて動きます。本物のメモが 1 本もない（仕組みだけを取り出した）リポジトリでも通ります。本物のメモを確かめるテスト（原本に自動生成ブロックや生成物が混ざっていないか、`build` で `src/` が変わらないか、全メモが lint を通るか）は、メモがあるときだけ動きます。
+ほとんどのテストは、仕組みのファイル（`scripts/`・テンプレート・`src/` の `index.html`・`quiz.html`・`settings.html`・`roadmap.html`・`assets/`）に `tests/fixtures/` のサンプルのメモ 2 本と設定を組み合わせて動きます。本物のメモが 1 本もない（仕組みだけを取り出した）リポジトリでも通ります。本物のメモを確かめるテスト（原本に自動生成ブロックや生成物が混ざっていないか、`build` が `src/` を書き換えないか、全メモが lint を通るか）は、メモがあるときだけ動きます。
 
 ```bash
 python3 -B -m unittest discover -s tests       # 全部（15 秒ほど）
@@ -478,9 +529,9 @@ python3 -B tests/snapshot.py OUTDIR            # 全コマンドの出力を保�
 
 | ファイル | 中身 |
 | --- | --- |
-| `tests/test_cli.py` | コマンドを外から動かす結合テスト。生成物を全部消して `build` すると同じ中身に戻るか、2 回目の `build` で何も変わらないか、`memo.config.json` を変えるとページ・入口スキル・URL が変わるか、`lint --fix`・`new`・`add`・`meta`・`preview`・`config` の動きなど。`RepositoryTest` だけは本物のメモで、コミット済みの生成物が最新か・全メモが lint を通るかを見る |
-| `tests/test_units.py` | 関数ごとの単体テスト。設定の読み込みとタイムゾーンの日付、サイト設定の差し込み、ブロックの差し込み位置と冪等性、廃止したクイズの片付け、CSS の化けの修正、Markdown 変換など |
-| `tests/snapshot.py` | テストではなく道具。全メモの `build`・`lint`・`preview` と各コマンドの出力をフォルダに保存する。リファクタリングの前後で 1 回ずつ実行し、`diff -r` で何も出なければ出力は変わっていない |
+| `tests/test_cli.py` | コマンドを外から動かす結合テスト。`build` が `src/` を書き換えないか、`dist/` を消して `build` すると同じ中身に戻るか、2 回目の `build` で何も変わらないか、`dist/` だけで公開できるか、`memo.config.json` を変えるとページ・入口スキル・URL が変わるか、`lint --fix`・`new`・`add`・`meta`・`preview`・`config` の動きなど。`RepositoryTest` だけは本物のメモで、原本がきれいか・`build` が `src/` を書き換えないか・全メモが lint を通るかを見る |
+| `tests/test_units.py` | 関数ごとの単体テスト。設定の読み込みとタイムゾーンの日付、サイト設定の差し込み、問題データの検証、ブロックの差し込み位置と冪等性、CSS の化けの修正、Markdown 変換、`</script>` のエスケープなど |
+| `tests/snapshot.py` | テストではなく道具。全メモの `build`（`dist/` の中身）・`lint`・`preview` と各コマンドの出力をフォルダに保存する。リファクタリングの前後で 1 回ずつ実行し、`diff -r` で何も出なければ出力は変わっていない |
 | `tests/helpers.py` | 「作業用リポジトリ」を作る共通処理（`Workspace()` はサンプル、`Workspace(real=True)` は本物のメモ） |
 | `tests/fixtures/` | テスト用のサンプルのメモ（`src/`）と設定（`memo.config.json`） |
 
@@ -488,18 +539,23 @@ python3 -B tests/snapshot.py OUTDIR            # 全コマンドの出力を保�
 
 | 変えたいもの | 触るファイル | その後 |
 | --- | --- | --- |
-| メモの本文 | `src/NAME.html` | `lint NAME` → `build` |
-| タイトル・説明・タグ・日付 | `meta NAME ...` | `build` |
+| メモの本文・問題 | `src/NAME.html` | `lint NAME` → push（公開は Deploy MEMO。手元の `build` は確認用） |
+| タイトル・説明・タグ・日付 | `meta NAME ...` | push |
+| 確認クイズの見た目・動き | `src/assets/memo-quiz.css`・`.js` | 何もしなくてよい（全メモに反映） |
+| クイズ表示の枠（HTML）・入る場所 | `memolib/blocks.py` の `QUIZ_BLOCK`・`apply_quiz` | `build`（全メモが書き換わる） |
 | アイコン・OGP のタグ | `memolib/blocks.py` の `head_block` | `build`（全ページが書き換わる） |
-| サイトのアクセント色 | `memo.config.json` の `branding.accent`・`accent_light` | `python3 branding/render.py` → `build`（全ページが書き換わる） |
+| サイトのアクセント色 | 設定ページ（`src/settings.html`）から Actions の `Set accent color`、または `memo.py accent` | Actions なら何もしなくてよい（画像も作り直す）。手元なら `build`（全ページが書き換わる。画像も揃えるなら `python3 branding/render.py`） |
 | アイコン・OGP 画像の文字・色 | `memo.config.json`（`site_name`・`description`・`branding`） | `python3 branding/render.py` → `build` |
 | アイコン・OGP 画像のデザイン | `branding/`（`og.html`・`icon.html`・`leaf.css`、テーマの色は `render.py` の `THEMES`） | `python3 branding/render.py` → `build` |
-| トップページ・ロードマップの見た目 | `src/index.html`・`src/roadmap.html` | 何もしなくてよい（サイト名などを入れる場所を増やしたら `build`） |
+| トップ・クイズ・設定ページの見た目 | `src/index.html`・`src/quiz.html`・`src/settings.html` | 何もしなくてよい（サイト名などを入れる場所を増やしたら `build`） |
+| クイズを使う・やめる | `memo.config.json` の `quiz` | `build`（オフにすると `dist/` からクイズのページ・データ・表示が消える） |
+| ロードマップを使う・やめる | `memo.config.json` の `roadmap` | `build`（オフにすると `dist/` からページとリンクが消える） |
+| ロードマップの項目 | `src/roadmap.html` の `ROADMAP` | 何もしなくてよい（チェックは公開したメモから自動で付く） |
 | サイト名・説明・リポジトリ・ブランチ・タイムゾーン | `memo.config.json` | `build`（全ページ・入口スキルが書き換わる。入口スキルはアプリ側にも貼り直す） |
 | 一覧に載せる項目 | `memolib/meta.py` の `read_meta`、`memolib/site.py` の `memos_json` | `build` |
 | Markdown 版の変換ルール | `memolib/markdown.py` の `_ToMarkdown`・`html_to_markdown` | `build`（全 Markdown 版が書き換わる） |
+| 設定ページの色の候補 | `src/settings.html` の `PRESETS` | 何もしなくてよい |
 | 新しいメモの雛形 | `.claude/skills/memo-style/template.html` | 何もしなくてよい |
-| ロードマップの項目 | `src/roadmap.html` の `ROADMAP` | 何もしなくてよい（`roadmap` が `true` なら push で公開） |
 | 公開ドメイン | `src/CNAME` | `build`（OGP の URL が変わる） |
 | 上の表にないスクリプトの処理 | `scripts/memolib/` の該当モジュール（[コードの構成とテスト](#コードの構成とテスト)） | [memo-maintain](.claude/skills/memo-maintain/SKILL.md) の手順でテストと前後比較 |
 
@@ -514,8 +570,8 @@ python3 -B tests/snapshot.py OUTDIR            # 全コマンドの出力を保�
 | --- | --- |
 | `scripts/`・`tests/`（`tests/fixtures/` を含む） | `memo.py` とテスト |
 | `.claude/skills/` | スキルとメモの雛形 |
-| `.github/workflows/` | 生成とテストのワークフロー |
-| `src/index.html`・`src/settings.html`・`src/roadmap.html`・`src/.nojekyll`・`src/assets/` | トップページ、設定ページ、ロードマップ（オプション）、アイコン |
+| `.github/workflows/` | デプロイ・テスト・アクセント色の固定のワークフロー |
+| `src/index.html`・`src/quiz.html`・`src/settings.html`・`src/roadmap.html`・`src/assets/` | トップ・クイズ・設定・ロードマップのページ、クイズの共通ファイル、アイコン（ロードマップはオプション。使うなら `ROADMAP` の例を自分のテーマに書き換える） |
 | `branding/` | アイコンと OGP 画像の生成元 |
 | `memo.config.json`・`README.md`・`memo-detail.md`・`LICENSE`・`.gitignore` | 設定・説明・ライセンス |
 
@@ -524,19 +580,19 @@ python3 -B tests/snapshot.py OUTDIR            # 全コマンドの出力を保�
 | 場所 | 中身 |
 | --- | --- |
 | `src/` 直下の上記以外の `*.html` | サンプルのメモ（`sample.html`・`sample-plain.html`） |
-| `dist/` | 生成物（`build` で作り直す。コミットされない） |
+| `dist/` | 生成物（コミットされない。`build` で作り直す） |
 
 **手順**
 
 ```bash
 # 1. サンプルのメモと生成物を消す
-find src -maxdepth 1 -name '*.html' ! -name index.html ! -name settings.html ! -name roadmap.html -delete
+find src -maxdepth 1 -name '*.html' ! -name index.html ! -name quiz.html ! -name settings.html ! -name roadmap.html -delete
 rm -rf dist
-# 2. memo.config.json の site_name・description・llms_description・repository・branch・deploy_branch・utc_offset_hours・roadmap・branding を自分のリポジトリに合わせる
+# 2. memo.config.json の site_name・description・llms_description・repository・branch・deploy_branch・utc_offset_hours・branding を自分のリポジトリに合わせる
 # 3. 作り直して確かめる
 python3 branding/render.py                 # アイコン・OGP 画像を設定から作り直す（要: playwright など）
 python3 scripts/memo.py build              # repository を書き換え忘れていると警告が出る
 python3 -B -m unittest discover -s tests   # 本物のメモを見るテストは飛ばされる
 ```
 
-あとは GitHub の設定（Pages の公開元・Actions の書き込み権限）を README の「はじめかた」のとおりにし、`dist/entry-skill/SKILL.md` をアプリ側のスキルとして登録すれば、アプリからも使えます。
+あとは GitHub の設定（Actions の書き込み権限、最初のデプロイで dist ブランチができたら Pages の公開元を dist ブランチの `/`（root）に）を README の「はじめかた」のとおりにし、`dist/entry-skill/SKILL.md` をアプリ側のスキルとして登録すれば、アプリからも使えます。

@@ -93,7 +93,8 @@ def main():
             pg.screenshot(path=str(ASSETS / "og.png"))
 
             pg.set_viewport_size({"width": 1024, "height": 1024})
-            for key, cls, holes in (("full", "", 5), ("small", "small t", 3)):
+            style = " lines" if b["icon"] == "lines" else ""  # 文字の代わりに横線（小さいアイコンだけ）
+            for key, cls, holes in (("full", style.strip(), 5), ("small", "small t" + style, 3)):
                 tmp.write_text(icon_tpl.replace("__VARS", css).replace("__CLS", cls)
                                .replace("__HOLES", "<i></i>" * holes).replace("__MARK", esc(b["mark"]))
                                .replace("__MSIZE", mark_size(b["mark"], key == "small")), encoding="utf-8")
@@ -113,7 +114,7 @@ def main():
         for f in [tmp, *shots.values()]:
             if f.exists():
                 os.remove(f)
-    print(f"title={b['title']!r} mark={b['mark']!r} theme={b['theme']} accent={b['accent']} accent_light={b['accent_light']}")
+    print(f"title={b['title']!r} mark={b['mark']!r} icon={b['icon']} theme={b['theme']} accent={b['accent']} accent_light={b['accent_light']}")
     print("updated: og.png, apple-touch-icon.png, icon-192.png, icon-32.png, favicon.ico")
 
 

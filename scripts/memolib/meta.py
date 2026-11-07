@@ -74,7 +74,7 @@ def memo_path(arg: str, must_exist: bool = True) -> Path:
     if not NAME_RE.match(name):
         sys.exit(f"ファイル名は英小文字・数字・ハイフンのみ: {name!r}")
     if f"{name}.html" in SPECIAL_NAMES:
-        label = {"index": "トップ", "settings": "設定", "roadmap": "ロードマップ"}.get(name, "特別なページ")
+        label = {"index": "トップ", "quiz": "クイズ", "settings": "設定", "roadmap": "ロードマップ"}.get(name, "特別なページ")
         sys.exit(f"{name}.html は特別なページです（{label}）。メモ名に使えません")
     target = SRC / f"{name}.html"
     if must_exist and not target.is_file():

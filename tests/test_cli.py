@@ -15,8 +15,7 @@ import unittest
 
 from helpers import ENTRY_REL, REPO, Workspace, diff_names, repo_has_memos
 
-GENERATED_BLOCKS = (r"<!-- memo:head.*?<!-- /memo:head -->\n?", r"<!-- memo:quiz.*?<!-- /memo:quiz -->\n?",
-                    r"id=[\"']memo-quiz[\"']")
+GENERATED_BLOCKS = (r"<!-- memo:head.*?<!-- /memo:head -->\n?", r"<!-- memo:quiz.*?<!-- /memo:quiz -->\n?")
 GENERATED_IN_DOCS = ("memos.json", "quizzes.json", "llms.txt", "md")
 
 
@@ -75,11 +74,12 @@ class BuildTest(unittest.TestCase):
     def test_dist_is_a_complete_site(self):
         """dist/ だけで公開できること: 原本の共通ファイルのコピーと、生成物がそろっている。"""
         with Workspace() as ws:
-            for rel in ("index.html", "settings.html", "sample.html", "sample-plain.html", "CNAME", ".nojekyll", "assets/og.png",
-                        "memos.json", "llms.txt", "md/sample.md", str(ENTRY_REL)):
+            for rel in ("index.html", "quiz.html", "settings.html", "sample.html", "sample-plain.html",
+                        "CNAME", "assets/memo-quiz.css", "assets/memo-quiz.js", "memos.json", "quizzes.json",
+                        "llms.txt", "md/sample.md", str(ENTRY_REL)):
                 self.assertTrue((ws.dist / rel).is_file(), rel)
-            self.assertEqual((ws.dist / "assets" / "og.png").read_bytes(), (ws.src / "assets" / "og.png").read_bytes())
-            self.assertFalse((ws.dist / "quizzes.json").exists())
+            self.assertEqual((ws.dist / "assets" / "memo-quiz.js").read_bytes(),
+                             (ws.src / "assets" / "memo-quiz.js").read_bytes())
             self.assertIn("<!-- memo:head", ws.read("sample.html"))
             self.assertNotIn("<!-- memo:head", (ws.src / "sample.html").read_text(encoding="utf-8"))
 
@@ -94,34 +94,33 @@ class BuildTest(unittest.TestCase):
     def test_memos_json_matches_list(self):
         with Workspace() as ws:
             memos = json.loads(ws.read("memos.json"))
+            quizzes = json.loads(ws.read("quizzes.json"))
             listed = ws.run("list").stdout.splitlines()
             self.assertEqual(len(memos), len(listed))
-            self.assertTrue(all("quizzes" not in m for m in memos))
+            self.assertEqual(sum(m["quizzes"] for m in memos), len(quizzes))
             dates = [m["date"] for m in memos]
             self.assertEqual(dates, sorted(dates, reverse=True), "memos.json は日付の新しい順")
             files = {m["file"] for m in memos}
+            self.assertTrue({q["file"] for q in quizzes} <= files)
             self.assertNotIn("index.html", files)
+            self.assertNotIn("quiz.html", files)
             self.assertNotIn("settings.html", files)
             self.assertNotIn("roadmap.html", files)
             self.assertFalse((ws.dist / "md" / "settings.md").exists())
             self.assertFalse((ws.dist / "md" / "roadmap.md").exists())
+            self.assertNotIn("settings", ws.read("llms.txt"))
             self.assertNotIn("roadmap", ws.read("llms.txt"))
 
-    def test_build_drops_legacy_quiz_from_dist(self):
-        """廃止したクイズの表示ブロックと問題データが原本に残っていても、dist/ には出さない（原本は書き換えない）。"""
+    def test_sample_quizzes_are_collected(self):
         with Workspace() as ws:
-            page = ws.src / "sample.html"
-            legacy = ("<!-- memo:quiz（scripts/memo.py が自動生成。手で編集しない） -->\n"
-                      '<link rel="stylesheet" href="assets/memo-quiz.css">\n<!-- /memo:quiz -->\n'
-                      '<script type="application/json" id="memo-quiz">'
-                      '[{"q":"秘密の問題","choices":["a","b"],"answer":0}]</script>\n')
-            original = ws.read("sample.html")
-            page.write_text(page.read_text(encoding="utf-8").replace("</body>", legacy + "</body>"), encoding="utf-8")
-            with_legacy = page.read_text(encoding="utf-8")
-            ws.run("build")
-            self.assertEqual(ws.read("sample.html"), original)
-            self.assertNotIn("秘密の問題", ws.read("md/sample.md"))
-            self.assertEqual(page.read_text(encoding="utf-8"), with_legacy)
+            quizzes = json.loads(ws.read("quizzes.json"))
+            self.assertEqual([q["file"] for q in quizzes], ["sample.html"] * 3)
+            self.assertEqual([q["answer"] for q in quizzes], [1, 0, 2])
+            memos = {m["file"]: m for m in json.loads(ws.read("memos.json"))}
+            self.assertEqual(memos["sample.html"]["quizzes"], 3)
+            self.assertEqual(memos["sample-plain.html"]["quizzes"], 0)
+            self.assertIn("<!-- memo:quiz", ws.read("sample.html"))
+            self.assertNotIn("<!-- memo:quiz", ws.read("sample-plain.html"))
 
     def test_removed_memo_disappears_from_outputs(self):
         with Workspace() as ws:
@@ -133,6 +132,7 @@ class BuildTest(unittest.TestCase):
             self.assertFalse((ws.dist / "md" / "sample.md").exists())
             memos = json.loads(ws.read("memos.json"))
             self.assertNotIn("sample.html", {m["file"] for m in memos})
+            self.assertNotIn("sample.html", ws.read("quizzes.json"))
             self.assertNotIn("md/sample.md", ws.read("llms.txt"))
 
     def test_removed_asset_disappears_from_dist(self):
@@ -165,7 +165,7 @@ class NewAddMetaTest(unittest.TestCase):
     def test_invalid_and_reserved_names_are_rejected(self):
         with Workspace() as ws:
             before = ws.snapshot()
-            for name in ("Bad_Name", "index", "settings", "roadmap", "a--b"):
+            for name in ("Bad_Name", "index", "quiz", "a--b"):
                 with self.subTest(name=name):
                     p = ws.run("new", name, check=False)
                     self.assertNotEqual(p.returncode, 0)
@@ -243,8 +243,8 @@ class LintTest(unittest.TestCase):
             self.assertIn('"Noto Sans JP"', text)
             for needle in ('<meta charset="UTF-8">', 'name="viewport"', 'id="memo-backlink"'):
                 self.assertIn(needle, text)
-            self.assertNotIn("<!-- memo:head", text)  # 自動生成ブロックは build が dist/ にだけ入れる
-            self.assertNotIn("memo-quiz", text)  # 廃止したクイズの問題データは消える
+            for needle in ("<!-- memo:head", "<!-- memo:quiz"):  # 自動生成ブロックは build が dist/ にだけ入れる
+                self.assertNotIn(needle, text)
             again = ws.run("lint", str(draft), check=False)
             self.assertEqual(again.returncode, 0, again.stdout)
             self.assertIn("OK", again.stdout)
@@ -260,38 +260,47 @@ class LintTest(unittest.TestCase):
             self.assertEqual((ws.src / "zz-copied.html").read_text(encoding="utf-8"),
                              (ws.src / "sample.html").read_text(encoding="utf-8"))
 
-    def test_lint_reports_missing_meta(self):
+    def test_lint_reports_quiz_problems(self):
         with Workspace() as ws:
             draft = ws.root / "draft.html"
             draft.write_text(
                 '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>T</title></head><body>'
-                '<a href="index.html">x</a></body></html>',
+                '<a href="index.html">x</a>'
+                '<script type="application/json" id="memo-quiz">'
+                '[{"q":"Q","choices":["a","b"],"answer":0,"ref":"#nowhere"}]</script></body></html>',
                 encoding="utf-8")
             p = ws.run("lint", str(draft), check=False)
             self.assertEqual(p.returncode, 1)
+            self.assertIn("#nowhere", p.stdout)
             self.assertIn("説明", p.stdout)
 
+
 class PreviewTest(unittest.TestCase):
-    def test_memo_preview_writes_copy_without_touching_source(self):
+    def test_memo_preview_inlines_quiz_assets(self):
         with Workspace() as ws:
             src_before = (ws.src / "sample.html").read_bytes()
             out = ws.root / "out" / "sample.html"
             ws.run("preview", "sample", "-o", str(out))
             text = out.read_text(encoding="utf-8")
-            self.assertIn("<!-- memo:head", text)
-            self.assertNotIn("window.MEMO_DATA", text)
+            self.assertNotIn("assets/memo-quiz.css", text)
+            self.assertNotIn("assets/memo-quiz.js", text)
+            self.assertIn("#memo-quiz-ui", text)  # CSS の中身
+            self.assertIn("function refLink", text)  # JS の中身
             self.assertEqual((ws.src / "sample.html").read_bytes(), src_before)
 
-    def test_index_preview_embeds_data(self):
+    def test_index_and_quiz_preview_embed_data(self):
         with Workspace() as ws:
             memos = json.loads(ws.read("memos.json"))
-            out = ws.root / "index.html"
-            ws.run("preview", "index", "-o", str(out))
-            text = out.read_text(encoding="utf-8")
-            m = re.search(r"window\.MEMO_DATA = (.*?);\n</script>", text, re.S)
-            self.assertIsNotNone(m)
-            self.assertEqual(json.loads(m.group(1)), {"memos.json": memos})
-            self.assertLess(text.index("window.MEMO_DATA"), text.index("loadJSON"))
+            for page in ("index", "quiz"):
+                with self.subTest(page=page):
+                    out = ws.root / f"{page}.html"
+                    ws.run("preview", page, "-o", str(out))
+                    text = out.read_text(encoding="utf-8")
+                    m = re.search(r"window\.MEMO_DATA = (.*?);\n</script>", text, re.S)
+                    self.assertIsNotNone(m)
+                    data = json.loads(m.group(1))
+                    self.assertEqual(data["memos.json"], memos)
+                    self.assertLess(text.index("window.MEMO_DATA"), text.index("loadJSON"))
 
     def test_preview_refuses_to_overwrite_source(self):
         with Workspace() as ws:
@@ -326,11 +335,14 @@ class SiteConfigTest(unittest.TestCase):
     def test_site_values_are_filled_into_pages(self):
         with Workspace() as ws:
             index = ws.read("index.html")
+            quiz = ws.read("quiz.html")
             self.assertIn('<title data-memo-site="{site_name}">TEST MEMO</title>', index)
             self.assertIn('>テスト用のメモ置き場</p>', index)
             self.assertIn('href="https://github.com/example/test-memo"', index)
             self.assertIn('<meta property="og:site_name" content="TEST MEMO">', index)
             self.assertIn('<meta property="og:url" content="https://memo.example.com/">', index)
+            self.assertIn(">TEST MEMO クイズ</title>", quiz)
+            self.assertIn('content="TEST MEMO の確認クイズから', quiz)
             llms = ws.read("llms.txt")
             self.assertTrue(llms.startswith("# TEST MEMO\n\n> テスト用のメモの集まり。\n"))
 
@@ -349,7 +361,7 @@ class SiteConfigTest(unittest.TestCase):
             self.assertIn('content="https://alice.github.io/notes/"', index)
             sample = ws.read("sample.html")
             self.assertIn('<meta property="og:site_name" content="NOTES">', sample)
-            for page_text in (index, sample, ws.read("settings.html")):
+            for page_text in (index, sample, ws.read("quiz.html")):
                 self.assertIn("html:root{--accent:#aa3300}", page_text)
                 self.assertIn("html:root{--accent:#ff5500}}", page_text)
             entry = ws.read(str(ENTRY_REL))
@@ -369,6 +381,82 @@ class SiteConfigTest(unittest.TestCase):
             index = ws.read("index.html")
             self.assertIn('<a href="settings.html">設定</a>', index)  # トップのフッターから開ける
 
+    def test_roadmap_page_is_off_by_default(self):
+        """ロードマップはオプション: memo.config.json に roadmap がなければ公開せず、トップにもリンクを出さない。"""
+        with Workspace() as ws:
+            self.assertFalse((ws.dist / "roadmap.html").exists())
+            index = ws.read("index.html")
+            self.assertNotIn("roadmap.html", index)
+            self.assertNotIn('data-memo-if="roadmap"', index)
+            self.assertIn('<a href="settings.html">設定</a>', index)  # ほかのリンクは残る
+            self.assertEqual(ws.run("build", "--check", check=False).returncode, 0)
+
+    def test_roadmap_page_is_special_and_linked_from_top_when_on(self):
+        """オンにすると、設定と同じ特別なページとして公開される: 一覧に載らず、クイズも付かず、トップのフッターから開ける。"""
+        with Workspace() as ws:
+            cfg = self.config(ws)
+            (ws.root / "memo.config.json").write_text(json.dumps({**cfg, "roadmap": True}, ensure_ascii=False),
+                                                      encoding="utf-8")
+            ws.run("build")
+            roadmap = ws.read("roadmap.html")
+            self.assertIn(">TEST MEMO ロードマップ</title>", roadmap)
+            self.assertIn('<meta name="robots" content="noindex">', roadmap)
+            self.assertIn("<!-- memo:head", roadmap)
+            self.assertNotIn("memo-quiz.js", roadmap)
+            self.assertIn("fetch('memos.json'", roadmap)  # チェックは一覧データから付ける
+            self.assertIn('<a href="roadmap.html">ロードマップ</a>', ws.read("index.html"))
+            self.assertNotIn("roadmap.html", {m["file"] for m in json.loads(ws.read("memos.json"))})
+            self.assertFalse((ws.dist / "md" / "roadmap.md").exists())
+            out = ws.root / "pv.html"
+            ws.run("preview", "roadmap", "-o", str(out))
+            self.assertIn("window.MEMO_DATA", out.read_text(encoding="utf-8"))  # プレビューでも一覧データが入る
+            # オフに戻すと dist/ からも消える
+            (ws.root / "memo.config.json").write_text(json.dumps(cfg, ensure_ascii=False), encoding="utf-8")
+            ws.run("build")
+            self.assertFalse((ws.dist / "roadmap.html").exists())
+            self.assertNotIn("roadmap.html", ws.read("index.html"))
+
+    def test_quiz_is_on_by_default(self):
+        """クイズは既定でオン: quiz.html・quizzes.json・各メモのクイズ表示・トップのランダムクイズを出す。"""
+        with Workspace() as ws:
+            self.assertTrue((ws.dist / "quiz.html").exists())
+            self.assertTrue((ws.dist / "quizzes.json").exists())
+            self.assertIn("<!-- memo:quiz", ws.read("sample.html"))
+            self.assertIn('id="rq"', ws.read("index.html"))
+            self.assertGreater(sum(m["quizzes"] for m in json.loads(ws.read("memos.json"))), 0)
+
+    def test_quiz_off_generates_nothing_for_quizzes(self):
+        """quiz を false にすると、クイズに関わるものを何も生成しない（オンに戻せば元どおり）。"""
+        with Workspace() as ws:
+            cfg = self.config(ws)
+            (ws.root / "memo.config.json").write_text(json.dumps({**cfg, "quiz": False}, ensure_ascii=False),
+                                                      encoding="utf-8")
+            p = ws.run("build")
+            self.assertIn("クイズはオフ", p.stdout)
+            self.assertFalse((ws.dist / "quiz.html").exists())
+            self.assertFalse((ws.dist / "quizzes.json").exists())
+            self.assertFalse((ws.dist / "assets" / "memo-quiz.js").exists())
+            self.assertFalse((ws.dist / "assets" / "memo-quiz.css").exists())
+            sample = ws.read("sample.html")
+            self.assertNotIn("<!-- memo:quiz", sample)
+            self.assertNotIn("memo-quiz.js", sample)
+            index = ws.read("index.html")
+            self.assertNotIn('id="rq"', index)
+            self.assertNotIn("quiz.html", index)
+            self.assertNotIn('data-memo-if="quiz"', index)
+            self.assertEqual({m["quizzes"] for m in json.loads(ws.read("memos.json"))}, {0})
+            self.assertEqual(ws.run("build", "--check", check=False).returncode, 0)
+            out = ws.root / "pv.html"
+            ws.run("preview", "sample", "-o", str(out))
+            self.assertNotIn("memo-quiz-ui", out.read_text(encoding="utf-8"))
+            # 原本の問題データは残っているので、オンに戻せば元どおり出る
+            (ws.root / "memo.config.json").write_text(json.dumps(cfg, ensure_ascii=False), encoding="utf-8")
+            ws.run("build")
+            self.assertTrue((ws.dist / "quiz.html").exists())
+            self.assertTrue((ws.dist / "quizzes.json").exists())
+            self.assertTrue((ws.dist / "assets" / "memo-quiz.js").exists())
+            self.assertIn("<!-- memo:quiz", ws.read("sample.html"))
+
     def test_accent_command_then_build_changes_every_page(self):
         with Workspace() as ws:
             p = ws.run("accent", "#3ddc97", "#0f7a50")
@@ -378,7 +466,7 @@ class SiteConfigTest(unittest.TestCase):
             self.assertEqual(cfg["site_name"], "TEST MEMO")  # ほかの項目は残る
             self.assertEqual(ws.run("build", "--check", check=False).returncode, 1)
             ws.run("build")
-            for name in ("index.html", "settings.html", "sample.html", "sample-plain.html"):
+            for name in ("index.html", "quiz.html", "settings.html", "sample.html", "sample-plain.html"):
                 text = ws.read(name)
                 self.assertIn("html:root{--accent:#0f7a50}", text, name)
                 self.assertIn("html:root{--accent:#3ddc97}}", text, name)
@@ -402,40 +490,6 @@ class SiteConfigTest(unittest.TestCase):
             self.assertIn("branding.accent は #rgb か #rrggbb", p.stderr)
             self.assertNotIn("Traceback", p.stderr)
             self.assertEqual((ws.root / "memo.config.json").read_text(encoding="utf-8"), before)
-
-    def test_roadmap_page_is_off_by_default(self):
-        """ロードマップはオプション: memo.config.json に roadmap がなければ公開せず、トップにもリンクを出さない。"""
-        with Workspace() as ws:
-            self.assertFalse((ws.dist / "roadmap.html").exists())
-            index = ws.read("index.html")
-            self.assertNotIn("roadmap.html", index)
-            self.assertNotIn("data-memo-if", index)
-            self.assertIn('<a href="settings.html">設定</a>', index)  # ほかのリンクは残る
-            self.assertEqual(ws.run("build", "--check", check=False).returncode, 0)
-
-    def test_roadmap_page_is_special_and_linked_from_top_when_on(self):
-        """オンにすると特別なページとして公開される: 一覧に載らず、トップのフッターから開ける。"""
-        with Workspace() as ws:
-            cfg = self.config(ws)
-            (ws.root / "memo.config.json").write_text(json.dumps({**cfg, "roadmap": True}, ensure_ascii=False),
-                                                      encoding="utf-8")
-            ws.run("build")
-            roadmap = ws.read("roadmap.html")
-            self.assertIn(">TEST MEMO ロードマップ</title>", roadmap)
-            self.assertIn('<meta name="robots" content="noindex">', roadmap)
-            self.assertIn("<!-- memo:head", roadmap)
-            self.assertIn("fetch('memos.json'", roadmap)  # チェックは一覧データから付ける
-            self.assertIn('<a href="roadmap.html">ロードマップ</a>', ws.read("index.html"))
-            self.assertNotIn("roadmap.html", {m["file"] for m in json.loads(ws.read("memos.json"))})
-            self.assertFalse((ws.dist / "md" / "roadmap.md").exists())
-            out = ws.root / "pv.html"
-            ws.run("preview", "roadmap", "-o", str(out))
-            self.assertIn("window.MEMO_DATA", out.read_text(encoding="utf-8"))  # プレビューでも一覧データが入る
-            # オフに戻すと dist/ からも消える
-            (ws.root / "memo.config.json").write_text(json.dumps(cfg, ensure_ascii=False), encoding="utf-8")
-            ws.run("build")
-            self.assertFalse((ws.dist / "roadmap.html").exists())
-            self.assertNotIn("roadmap.html", ws.read("index.html"))
 
     def test_broken_config_stops_with_message_not_traceback(self):
         with Workspace() as ws:

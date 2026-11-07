@@ -15,6 +15,8 @@
   --line: #dde1e8;
   --accent: #0077b6;
   --chip: #eceff4;
+  --ok: #1a7f37;
+  --ng: #cf222e;
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -25,6 +27,8 @@
     --line: #1e2d3d;
     --accent: #00d4ff;
     --chip: #18222f;
+    --ok: #3fb950;
+    --ng: #f85149;
   }
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -108,6 +112,53 @@ h1 {
 .meta span.t { background: var(--chip); border-radius: 4px; padding: 1px 6px; }
 .meta time { margin-left: auto; }
 .empty { color: var(--fg-2); font-size: 0.85rem; padding: 24px 0; }
+/* ランダムクイズ（普段は閉じておく） */
+.rq { margin: -8px 0 20px; }
+.rq > summary {
+  display: inline-flex; align-items: center; gap: 6px;
+  list-style: none; cursor: pointer; user-select: none;
+  color: var(--fg-2);
+  font: 600 0.75rem 'JetBrains Mono', monospace;
+  padding: 4px 2px;
+}
+.rq > summary::-webkit-details-marker { display: none; }
+.rq > summary::after { content: '▸'; display: inline-block; transition: transform .15s; }
+.rq[open] > summary::after { transform: rotate(90deg); }
+.rq > summary:hover { color: var(--accent); }
+.rq-body {
+  margin-top: 8px;
+  padding: 16px 18px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.rq-from { font-size: 0.72rem; color: var(--fg-2); font-family: 'JetBrains Mono', monospace; }
+.rq-q { font-weight: 700; margin: 4px 0 10px; line-height: 1.6; }
+.rq-choices { display: flex; flex-direction: column; gap: 6px; }
+.rq-c {
+  text-align: left; padding: 8px 12px;
+  border: 1px solid var(--line); border-radius: 8px;
+  background: var(--chip); color: var(--fg);
+  font: inherit; font-size: 0.88rem; line-height: 1.5; cursor: pointer;
+}
+.rq-c:hover:not(:disabled) { border-color: var(--accent); }
+.rq-c:disabled { cursor: default; opacity: .6; }
+.rq-c.ok { opacity: 1; border-color: var(--ok); box-shadow: inset 3px 0 0 var(--ok); }
+.rq-c.ng { opacity: 1; border-color: var(--ng); box-shadow: inset 3px 0 0 var(--ng); }
+.rq-fb { margin-top: 10px; font-size: 0.83rem; color: var(--fg-2); line-height: 1.6; }
+.rq-fb b.ok { color: var(--ok); }
+.rq-fb b.ng { color: var(--ng); }
+.rq-actions { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin-top: 12px; }
+.rq-actions a { color: var(--accent); font-size: 0.8rem; font-weight: 700; text-decoration: none; }
+.rq-actions a:hover { text-decoration: underline; }
+.rq-actions a.rq-more { margin-left: auto; color: var(--fg-2); font-weight: 600; font-size: 0.75rem; }
+.rq-actions a.rq-more:hover { color: var(--accent); }
+.rq-next {
+  border: 1px solid var(--line); background: var(--chip); color: var(--fg-2);
+  border-radius: 999px; padding: 4px 12px;
+  font: 600 0.75rem 'JetBrains Mono', monospace; cursor: pointer;
+}
+.rq-next:hover { border-color: var(--accent); color: var(--accent); }
 footer { margin-top: 40px; font-size: 0.75rem; color: var(--fg-2); }
 footer a { color: var(--accent); }
 </style>
@@ -128,6 +179,21 @@ footer a { color: var(--accent); }
     <div class="tags" id="tags"></div>
   </div>
 
+  <details class="rq" id="rq" hidden data-memo-if="quiz">
+    <summary>🎲 ランダムクイズ</summary>
+    <div class="rq-body">
+      <p class="rq-from" id="rq-from"></p>
+      <p class="rq-q" id="rq-q"></p>
+      <div class="rq-choices" id="rq-choices"></div>
+      <p class="rq-fb" id="rq-fb" hidden></p>
+      <div class="rq-actions">
+        <button class="rq-next" id="rq-next" type="button">次の問題 →</button>
+        <a id="rq-link" href="#" hidden></a>
+        <a class="rq-more" href="quiz.html">🎯 10 問に挑戦（ランダム・カテゴリ別）</a>
+      </div>
+    </div>
+  </details>
+
   <div class="grid" id="list"></div>
   <p class="empty" id="empty" hidden>該当するメモがありません</p>
 
@@ -139,7 +205,7 @@ footer a { color: var(--accent); }
 </div>
 
 <script>
-// 一覧は memos.json から読み込む（memo.py build が生成。memo-detail.md 参照）
+// 一覧は memos.json、ランダムクイズの問題は quizzes.json から読み込む（どちらも memo.py build が生成。memo-detail.md 参照）
 // memo.py preview で作ったプレビュー用のコピーでは、埋め込まれた window.MEMO_DATA を使う
 const MEMO_DATA = window.MEMO_DATA || null;
 async function loadJSON(name, fresh) {
@@ -210,6 +276,7 @@ async function loadList(fresh) {
   }
   buildTags();
   render();
+  randomQuiz.update(MEMOS.reduce((n, m) => n + (m.quizzes || 0), 0), fresh);
 }
 
 q.addEventListener('input', render);
@@ -223,6 +290,92 @@ document.getElementById('refresh').addEventListener('click', e => {
     btn.disabled = false;
   });
 });
+
+// ---- ランダムクイズ（全メモの確認クイズから 1 問。開いたときに quizzes.json を読み込む）
+// memo.config.json の quiz が false なら build が #rq ごと取り除くので、何もしない
+const randomQuiz = (() => {
+  const box = document.getElementById('rq');
+  if (!box) return { update() {} };
+  const $ = id => document.getElementById(id);
+  let pool = null;
+  let fresh = false;
+  let last = -1;
+
+  function show() {
+    if (!pool || !pool.length) return;
+    let i = Math.floor(Math.random() * pool.length);
+    if (pool.length > 1 && i === last) i = (i + 1) % pool.length;
+    last = i;
+    const q = pool[i];
+    $('rq-from').textContent = q.title;
+    $('rq-q').textContent = q.q;
+    $('rq-fb').hidden = true;
+    $('rq-link').hidden = true;
+    // 選択肢は毎回シャッフル（正解の位置で覚えないように）
+    const order = q.choices.map((_, k) => k).sort(() => Math.random() - 0.5);
+    const ch = $('rq-choices');
+    ch.textContent = '';
+    for (const k of order) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'rq-c';
+      b.textContent = q.choices[k];
+      b.dataset.k = k;
+      b.onclick = () => answer(q, k);
+      ch.appendChild(b);
+    }
+  }
+
+  function answer(q, k) {
+    const ok = k === q.answer;
+    for (const b of $('rq-choices').children) {
+      b.disabled = true;
+      if (+b.dataset.k === q.answer) b.classList.add('ok');
+      else if (+b.dataset.k === k) b.classList.add('ng');
+    }
+    const fb = $('rq-fb');
+    fb.innerHTML = ok ? '<b class="ok">⭕ 正解</b> ' : '<b class="ng">❌ 不正解</b> ';
+    fb.append((ok ? '' : `（正解: ${q.choices[q.answer]}）`) + (q.explain || ''));
+    fb.hidden = false;
+    const link = $('rq-link');
+    link.href = q.file + (q.ref || '');
+    link.textContent = 'メモを開く →';
+    link.hidden = false;
+  }
+
+  async function open() {
+    if (!pool) {
+      $('rq-from').textContent = '';
+      $('rq-q').textContent = '読み込み中…';
+      $('rq-choices').textContent = '';
+      try {
+        pool = await loadJSON('quizzes.json', fresh);
+      } catch (e) {
+        $('rq-q').textContent = '問題を読み込めませんでした。';
+        return;
+      }
+      fresh = false;
+      last = -1;
+    }
+    if (last < 0) show();
+  }
+
+  box.addEventListener('toggle', () => { if (box.open) open(); });
+  $('rq-next').onclick = show;
+
+  return {
+    // total: memos.json から数えた問題数。fresh: 一覧を更新したときは問題も読み直す
+    update(total, isFresh) {
+      box.hidden = !total;
+      box.querySelector('summary').textContent = `🎲 ランダムクイズ（${total} 問）`;
+      if (isFresh) {
+        pool = null;
+        fresh = true;
+        if (box.open) open();
+      }
+    },
+  };
+})();
 
 loadList(false);
 </script>

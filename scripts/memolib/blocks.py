@@ -1,11 +1,12 @@
-"""build が dist/ のページに差し込む自動生成ブロック（memo:head）と「一覧に戻る」フッター、
-サイト設定の差し込み、旧クイズの片付け。原本（src/）には自動生成ブロックを置かない。"""
+"""各ページに差し込む自動生成ブロック（memo:head・memo:quiz）と「一覧に戻る」フッター、
+確認クイズの問題データの読み取りと検証。"""
 from __future__ import annotations
 
 import html
+import json
 import re
 
-from .config import (CONFIG, HEAD_BEGIN, HEAD_END, HEAD_RE, OG_VERSION, OPTIONAL_PAGES, SITE_NAME, SITE_URL,
+from .config import (ASSETS, CONFIG, HEAD_BEGIN, HEAD_END, HEAD_RE, OG_VERSION, OPTIONAL_PAGES, SITE_NAME, SITE_URL,
                      SPECIAL_NAMES, accents)
 from .meta import parse_meta
 
@@ -76,24 +77,105 @@ def apply_head(text: str, filename: str) -> str:
     return text[:pos] + "\n" + block + text[pos:]
 
 
-# ---------------------------------------------------------------- 旧クイズの片付け
+# ---------------------------------------------------------------- クイズ
 #
-# 確認クイズの機能は廃止した。以前のメモに残っている表示ブロック（<!-- memo:quiz -->）と
-# 問題データ（<script type="application/json" id="memo-quiz">）は lint・build が取り除く。
+# 各メモは問題データだけを持つ:
+#   <script type="application/json" id="memo-quiz">
+#   [{"q": "問題文", "choices": ["A", "B", "C"], "answer": 0,
+#     "explain": "解説", "ref": "#本文の見出しなどの id"}]
+#   explain / ref は任意。ref があると、間違えたときに本文の該当箇所へ飛ぶリンクが出る。
+#   </script>
+# 表示用の UI（<!-- memo:quiz --> ブロック）は build が dist/ のページ末尾に自動で入れる（原本には入れない）。
+# memo.config.json の quiz が false なら、ブロックも quizzes.json・quiz.html も作らない。
+# build は全メモの問題を dist/quizzes.json に集める（トップのランダムクイズと quiz.html 用）。
 
+QUIZ_BEGIN = "<!-- memo:quiz（scripts/memo.py が自動生成。手で編集しない） -->"
+QUIZ_END = "<!-- /memo:quiz -->"
 QUIZ_RE = re.compile(r"<!-- memo:quiz.*?<!-- /memo:quiz -->\n?", re.S)
 QUIZ_DATA_RE = re.compile(
-    r"<script\b[^>]*\bid=[\"']memo-quiz[\"'][^>]*>.*?</script>\n?", re.S | re.I)
+    r"<script\b[^>]*\bid=[\"']memo-quiz[\"'][^>]*>(.*?)</script>", re.S | re.I)
+
+# 表示の CSS / JS は src/assets/memo-quiz.css・memo-quiz.js に 1 つだけ置き、各メモからは参照する。
+# 会話内プレビューのように HTML 1 枚しか渡せない場面では、preview コマンドが中身を埋め込む。
+QUIZ_CSS = ASSETS / "memo-quiz.css"
+QUIZ_JS = ASSETS / "memo-quiz.js"
+QUIZ_CSS_TAG = '<link rel="stylesheet" href="assets/memo-quiz.css">'
+QUIZ_JS_TAG = '<script src="assets/memo-quiz.js" defer></script>'
+QUIZ_BLOCK = QUIZ_BEGIN + """
+""" + QUIZ_CSS_TAG + """
+<section id="memo-quiz-ui" hidden aria-labelledby="memo-quiz-title">
+<h2 id="memo-quiz-title">確認クイズ <small></small></h2>
+<div class="mq-list"></div>
+<div class="mq-result" hidden aria-live="polite"></div>
+<button type="button" class="mq-reset">やり直す</button>
+</section>
+""" + QUIZ_JS_TAG + """
+""" + QUIZ_END + "\n"
 
 
-def strip_quiz(text: str) -> str:
-    """旧クイズの表示ブロックと問題データを取り除く（無ければそのまま）。"""
-    return QUIZ_DATA_RE.sub("", QUIZ_RE.sub("", text))
+def validate_quiz(qs) -> list[str]:
+    """問題データの形をチェックし、問題点のリストを返す（空なら OK）。"""
+    if not isinstance(qs, list) or not qs:
+        return ["クイズは 1 問以上の配列にする"]
+    probs = []
+    for i, q in enumerate(qs, 1):
+        if not isinstance(q, dict):
+            probs.append(f"Q{i}: オブジェクトではない")
+            continue
+        if not isinstance(q.get("q"), str) or not q["q"].strip():
+            probs.append(f"Q{i}: q（問題文）がない")
+        ch = q.get("choices")
+        if not (isinstance(ch, list) and 2 <= len(ch) <= 5
+                and all(isinstance(c, str) and c.strip() for c in ch)):
+            probs.append(f"Q{i}: choices は 2〜5 個の文字列にする")
+            continue
+        a = q.get("answer")
+        if isinstance(a, bool) or not isinstance(a, int) or not 0 <= a < len(ch):
+            probs.append(f"Q{i}: answer は choices の番号（0 始まり）にする")
+        if "explain" in q and not isinstance(q["explain"], str):
+            probs.append(f"Q{i}: explain は文字列にする")
+        if "ref" in q and not (isinstance(q["ref"], str) and re.fullmatch(r"#[\w-]+", q["ref"])):
+            probs.append(f"Q{i}: ref は \"#id\" の形にする")
+    return probs
+
+
+def read_quiz(text: str) -> tuple[list | None, list[str]]:
+    """(問題リスト or None（データなし）, 問題点) を返す。"""
+    m = QUIZ_DATA_RE.search(QUIZ_RE.sub("", text))
+    if not m:
+        return None, []
+    try:
+        qs = json.loads(m.group(1))
+    except json.JSONDecodeError as e:
+        return None, [f"クイズの JSON が壊れている（{e.msg}, {e.lineno} 行目）"]
+    probs = validate_quiz(qs)
+    if not probs and len(qs) >= 3 and len({q["answer"] for q in qs}) == 1:
+        probs.append("正解の位置（answer）が全問同じ。選択肢の順番を入れ替えて散らす")
+    if not probs:
+        for i, q in enumerate(qs, 1):
+            ref = q.get("ref")
+            if ref and not re.search(rf"\bid=[\"']?{re.escape(ref[1:])}[\"'\s>]", text):
+                probs.append(f"Q{i}: ref の飛び先 {ref} がページ内にない")
+    return qs, probs
+
+
+def apply_quiz(text: str) -> str:
+    """問題データがあれば表示用ブロックを入れる／更新する。なければ取り除く。"""
+    if not QUIZ_DATA_RE.search(QUIZ_RE.sub("", text)):
+        return QUIZ_RE.sub("", text)
+    if QUIZ_RE.search(text):
+        return QUIZ_RE.sub(lambda _: QUIZ_BLOCK, text, count=1)
+    m = re.search(rf"<footer[^>]*\bid=[\"']?{BACKLINK_ID}", text)
+    if not m:
+        bodies = list(re.finditer(r"</body>", text, re.I))
+        m = bodies[-1] if bodies else None
+    pos = m.start() if m else len(text)
+    return text[:pos] + QUIZ_BLOCK + text[pos:]
 
 
 # ---------------------------------------------------------------- サイト設定の差し込み
 #
-# トップ・設定・ロードマップページの「サイト名」「説明」「リポジトリへのリンク」「今のアクセント色」は
+# トップ・クイズ・設定ページの「サイト名」「説明」「リポジトリへのリンク」「今のアクセント色」は
 # memo.config.json から入れる（使える名前は site_fields()）。
 # ページ側では書き換えたい要素に属性で目印を付ける（値は {site_name} などを埋め込んだ書式）。
 #   <h1 data-memo-site="{site_name}">…</h1>                → 要素の中身（テキスト）を置き換える
@@ -151,11 +233,12 @@ def apply_site(text: str) -> str:
 
 
 def strip_generated(text: str) -> str:
-    """自動生成ブロック（head）と旧クイズを取り除く。原本（src/）には置かず、build が dist/ のページにだけ入れる。"""
-    return strip_quiz(HEAD_RE.sub("", text))
+    """自動生成ブロック（head・クイズ）を取り除く。原本（src/）には置かず、build が dist/ のページにだけ入れる。"""
+    return QUIZ_RE.sub("", HEAD_RE.sub("", text))
 
 
 def apply_generated(text: str, filename: str) -> str:
-    """自動生成ブロック（head）とサイト設定の差し込みを最新にし、旧クイズを取り除く（build が dist/ に書き出すページ用）。"""
+    """自動生成ブロック（head・クイズ）とサイト設定の差し込みをすべて最新にする（build が dist/ に書き出すページ用）。"""
     text = apply_head(apply_site(text), filename)
-    return text if filename in SPECIAL_NAMES else strip_quiz(text)
+    # クイズがオフ（memo.config.json の quiz が false）なら表示のブロックを入れない。原本の問題データはそのまま残す
+    return text if filename in SPECIAL_NAMES or not CONFIG["quiz"] else apply_quiz(text)
