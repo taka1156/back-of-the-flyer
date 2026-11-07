@@ -122,7 +122,7 @@ React・Vue・Svelte・Solid など Vite ベースのもの、メタフレーム
 | `vp why react` | なぜ入っているかを表示 |
 | `vp info react` | レジストリの情報（版・dist-tag）を表示 |
 | `vp list` | 入っているパッケージ。 `-g` でグローバル |
-| `vp pm audit --json` | `vp pm <command>` で使っているパッケージマネージャーのコマンドをそのまま実行 |
+| `vp pm audit --json` | `vp pm <command>` で、検出したパッケージマネージャーに合わせてコマンドを実行（追加のオプションは `--` の後ろに書くと、そのマネージャーへ渡る） |
 
 | コマンド | やること |
 | --- | --- |
@@ -164,12 +164,12 @@ React・Vue・Svelte・Solid など Vite ベースのもの、メタフレーム
 | `vp cache clean` | タスクのキャッシュ（node_modules/.vite/task-cache）を消す |
 | `vp exec tsc --noEmit` | プロジェクトに入っているコマンドを実行（ダウンロードしない） |
 | `vpx eslint .` | 手元にあれば使い、無ければ取ってきて実行（npx 相当。TS ファイルも実行できる） |
-| `vp dlx create-vite` | 毎回ダウンロードして 1 回だけ実行 |
+| `vp dlx create-vite` | 依存に追加せずにパッケージを取ってきて 1 回だけ実行 |
 
 | コマンド | やること |
 | --- | --- |
 | `vp env setup` | Node.js とパッケージマネージャーの切り替え用シム・シェル設定を作る |
-| `vp env pin lts pnpm@10` | プロジェクトの版を固定（.node-version・packageManager などに書く） |
+| `vp env pin lts pnpm@10` | プロジェクトの版を固定（既にある `.node-version` ・ `packageManager` はそこを更新し、無ければ package.json の `devEngines` に書く。 `--target` で書き込み先を選べる） |
 | `vp env use 20 pnpm@10` | 今のシェルだけ版を切り替え。 `--unset` で戻す |
 | `vp env install` | 固定した版を入れる |
 | `vp env default lts` | グローバルの既定の版 |
@@ -224,7 +224,7 @@ export default defineConfig({
 
 **「package.json の scripts も自動でキャッシュされる」** → 既定でキャッシュされるのは vite.config.ts の `run.tasks` だけ。scripts は `vp run --cache` が必要。同じ名前のタスクを両方に書くことはできない。
 
-**「環境変数が変わればキャッシュは無効になる」** → キャッシュのキーになるのは `cache.env` に書いた変数だけ。ビルド結果が変わる変数は書いておく。
+**「環境変数が変わればキャッシュは無効になる」** → キャッシュのキーになるのは `cache.env` に書いた変数だけ。ただし `vp build` は `VITE_*` と `NODE_ENV` を自動で伝えるので、それらは書かなくてよい。それ以外で結果が変わる変数は `cache.env` に書いておく。
 
 **「vp upgrade でプロジェクトの Vite+ も上がる」** → `vp upgrade` はグローバルの `vp` だけ。プロジェクトの `vite-plus` は別に更新する（ `vp toolchain` で版を確認）。
 

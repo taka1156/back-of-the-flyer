@@ -255,7 +255,7 @@ footer#memo-backlink a:hover { color: var(--accent); }
 <tr><td><code>vp why react</code></td><td>なぜ入っているかを表示</td></tr>
 <tr><td><code>vp info react</code></td><td>レジストリの情報（版・dist-tag）を表示</td></tr>
 <tr><td><code>vp list</code></td><td>入っているパッケージ。<code>-g</code> でグローバル</td></tr>
-<tr><td><code>vp pm audit --json</code></td><td><code>vp pm &lt;command&gt;</code> で使っているパッケージマネージャーのコマンドをそのまま実行</td></tr>
+<tr><td><code>vp pm audit --json</code></td><td><code>vp pm &lt;command&gt;</code> で、検出したパッケージマネージャーに合わせてコマンドを実行（追加のオプションは <code>--</code> の後ろに書くと、そのマネージャーへ渡る）</td></tr>
 </tbody></table>
   </div>
   <div class="panel card" id="t-dev" hidden>
@@ -300,13 +300,13 @@ footer#memo-backlink a:hover { color: var(--accent); }
 <tr><td><code>vp cache clean</code></td><td>タスクのキャッシュ（node_modules/.vite/task-cache）を消す</td></tr>
 <tr><td><code>vp exec tsc --noEmit</code></td><td>プロジェクトに入っているコマンドを実行（ダウンロードしない）</td></tr>
 <tr><td><code>vpx eslint .</code></td><td>手元にあれば使い、無ければ取ってきて実行（npx 相当。TS ファイルも実行できる）</td></tr>
-<tr><td><code>vp dlx create-vite</code></td><td>毎回ダウンロードして 1 回だけ実行</td></tr>
+<tr><td><code>vp dlx create-vite</code></td><td>依存に追加せずにパッケージを取ってきて 1 回だけ実行</td></tr>
 </tbody></table>
   </div>
   <div class="panel card" id="t-env" hidden>
 <table class="cheat"><thead><tr><th>コマンド</th><th>やること</th></tr></thead><tbody>
 <tr><td><code>vp env setup</code></td><td>Node.js とパッケージマネージャーの切り替え用シム・シェル設定を作る</td></tr>
-<tr><td><code>vp env pin lts pnpm@10</code></td><td>プロジェクトの版を固定（.node-version・packageManager などに書く）</td></tr>
+<tr><td><code>vp env pin lts pnpm@10</code></td><td>プロジェクトの版を固定（既にある <code>.node-version</code>・<code>packageManager</code> はそこを更新し、無ければ package.json の <code>devEngines</code> に書く。<code>--target</code> で書き込み先を選べる）</td></tr>
 <tr><td><code>vp env use 20 pnpm@10</code></td><td>今のシェルだけ版を切り替え。<code>--unset</code> で戻す</td></tr>
 <tr><td><code>vp env install</code></td><td>固定した版を入れる</td></tr>
 <tr><td><code>vp env default lts</code></td><td>グローバルの既定の版</td></tr>
@@ -353,7 +353,7 @@ export default defineConfig({
     <div class="card"><b>「vp test はウォッチし続ける」</b> → Vitest 単体と違い、<code>vp test</code> は 1 回実行して終わる。ウォッチは <code>vp test watch</code>。</div>
     <div class="card"><b>「vp dev で package.json の dev スクリプトが動く」</b> → <code>vp dev</code> は常に組み込みの Vite 開発サーバー。スクリプトは <code>vp run dev</code>。</div>
     <div class="card"><b>「package.json の scripts も自動でキャッシュされる」</b> → 既定でキャッシュされるのは vite.config.ts の <code>run.tasks</code> だけ。scripts は <code>vp run --cache</code> が必要。同じ名前のタスクを両方に書くことはできない。</div>
-    <div class="card"><b>「環境変数が変わればキャッシュは無効になる」</b> → キャッシュのキーになるのは <code>cache.env</code> に書いた変数だけ。ビルド結果が変わる変数は書いておく。</div>
+    <div class="card"><b>「環境変数が変わればキャッシュは無効になる」</b> → キャッシュのキーになるのは <code>cache.env</code> に書いた変数だけ。ただし <code>vp build</code> は <code>VITE_*</code> と <code>NODE_ENV</code> を自動で伝えるので、それらは書かなくてよい。それ以外で結果が変わる変数は <code>cache.env</code> に書いておく。</div>
     <div class="card"><b>「vp upgrade でプロジェクトの Vite+ も上がる」</b> → <code>vp upgrade</code> はグローバルの <code>vp</code> だけ。プロジェクトの <code>vite-plus</code> は別に更新する（<code>vp toolchain</code> で版を確認）。</div>
   </div>
 
