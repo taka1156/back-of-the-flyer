@@ -4,5 +4,5 @@
 
 ## Memos
 
-- [サンプルのメモ](https://repo.github.io/sample/md/sample.md): テスト用のサンプル。クイズと別メモへのリンクを含む（サンプル, テスト / 2026-01-10）
-- [クイズのないメモ](https://repo.github.io/sample/md/sample-plain.md): テスト用のサンプル。クイズを含まない（テスト / 2026-01-05）
+- [サンプルのメモ](https://repo.github.io/sample/md/sample.md): テスト用のサンプル。図と別メモへのリンクを含む（サンプル, テスト / 2026-01-10）
+- [最小のメモ](https://repo.github.io/sample/md/sample-plain.md): テスト用のサンプル。本文だけの最小のページ（テスト / 2026-01-05）

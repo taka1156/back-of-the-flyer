@@ -7,7 +7,6 @@ from __future__ import annotations
 import datetime as dt
 import json
 import unittest
-from html.parser import HTMLParser
 
 import helpers  # noqa: F401  scripts/ を import できるようにする
 from memolib import blocks, config, entry, lint, markdown, meta, site
@@ -17,13 +16,13 @@ def page(head: str = "", body: str = "") -> str:
     return f"<!DOCTYPE html>\n<html><head>\n{head}</head>\n<body>\n{body}</body>\n</html>\n"
 
 
-QUIZ_OK = [{"q": "Q1", "choices": ["a", "b"], "answer": 0},
-           {"q": "Q2", "choices": ["a", "b", "c"], "answer": 2, "explain": "e", "ref": "#s"}]
-
-
-def quiz_script(data) -> str:
-    body = data if isinstance(data, str) else json.dumps(data, ensure_ascii=False)
-    return f'<script type="application/json" id="memo-quiz">{body}</script>\n'
+# 廃止した確認クイズの名残（以前のメモに残っている表示ブロックと問題データ）
+LEGACY_QUIZ = ("<!-- memo:quiz（scripts/memo.py が自動生成。手で編集しない） -->\n"
+               '<link rel="stylesheet" href="assets/memo-quiz.css">\n'
+               '<section id="memo-quiz-ui" hidden><h2>確認クイズ</h2></section>\n'
+               "<!-- /memo:quiz -->\n"
+               '<script type="application/json" id="memo-quiz">'
+               '[{"q": "秘密の問題", "choices": ["a", "b"], "answer": 0}]</script>\n')
 
 
 class ConfigTest(unittest.TestCase):
@@ -172,7 +171,7 @@ class MetaTest(unittest.TestCase):
             self.assertEqual(meta.memo_path(arg, must_exist=False), target)
 
     def test_memo_path_rejects_reserved_and_bad_names(self):
-        for arg in ("index", "quiz.html", "Bad_Name"):
+        for arg in ("index", "index.html", "Bad_Name"):
             with self.assertRaises(SystemExit):
                 meta.memo_path(arg, must_exist=False)
 
@@ -204,58 +203,23 @@ class HeadBlockTest(unittest.TestCase):
         self.assertLess(once.index(config.HEAD_BEGIN), once.index("</head>"))
 
 
-class QuizTest(unittest.TestCase):
-    def test_validate_accepts_good_data(self):
-        self.assertEqual(blocks.validate_quiz(QUIZ_OK), [])
+class LegacyQuizTest(unittest.TestCase):
+    def test_strip_quiz_removes_block_and_data(self):
+        text = page("<title>T</title>", "<p>本文</p>\n" + LEGACY_QUIZ + blocks.BACKLINK + "\n")
+        stripped = blocks.strip_quiz(text)
+        self.assertEqual(stripped, page("<title>T</title>", "<p>本文</p>\n" + blocks.BACKLINK + "\n"))
+        self.assertEqual(blocks.strip_quiz(stripped), stripped)
 
-    def test_validate_reports_each_problem(self):
-        bad = [
-            {"choices": ["a", "b"], "answer": 0},                      # q がない
-            {"q": "Q", "choices": ["a"], "answer": 0},                  # 選択肢が 1 個
-            {"q": "Q", "choices": ["a", "b"], "answer": 2},             # 範囲外
-            {"q": "Q", "choices": ["a", "b"], "answer": True},          # bool は番号ではない
-            {"q": "Q", "choices": ["a", "b"], "answer": 0, "ref": "s"},  # # がない
-            "文字列",
-        ]
-        probs = blocks.validate_quiz(bad)
-        for i in range(1, len(bad) + 1):
-            self.assertTrue(any(p.startswith(f"Q{i}:") for p in probs), (i, probs))
-        self.assertTrue(blocks.validate_quiz([]))
+    def test_apply_generated_strips_quiz_from_memos(self):
+        text = page("<title>T</title>", LEGACY_QUIZ)
+        self.assertNotIn("memo-quiz", blocks.apply_generated(text, "memo.html"))
 
-    def test_read_quiz_checks_json_refs_and_answer_spread(self):
-        qs, probs = blocks.read_quiz(page(body='<h2 id="s">S</h2>' + quiz_script(QUIZ_OK)))
-        self.assertEqual((qs, probs), (QUIZ_OK, []))
-
-        _, probs = blocks.read_quiz(page(body=quiz_script(QUIZ_OK)))  # #s がページにない
-        self.assertTrue(any("#s" in p for p in probs))
-
-        _, probs = blocks.read_quiz(page(body=quiz_script("[{broken")))
-        self.assertTrue(any("JSON" in p for p in probs))
-
-        same = [{"q": f"Q{i}", "choices": ["a", "b"], "answer": 1} for i in range(3)]
-        _, probs = blocks.read_quiz(page(body=quiz_script(same)))
-        self.assertTrue(any("answer" in p for p in probs))
-
-        self.assertEqual(blocks.read_quiz(page(body="<p>なし</p>")), (None, []))
-
-    def test_apply_quiz_inserts_before_footer_once_and_removes_when_no_data(self):
-        text = page(body="<p>本文</p>\n" + blocks.BACKLINK + "\n" + quiz_script(QUIZ_OK))
-        once = blocks.apply_quiz(text)
-        self.assertEqual(blocks.apply_quiz(once), once)
-        self.assertEqual(once.count(blocks.QUIZ_BEGIN), 1)
-        self.assertLess(once.index(blocks.QUIZ_BEGIN), once.index(blocks.BACKLINK_ID))
-        self.assertIn(blocks.QUIZ_JS_TAG, once)
-        without = once.replace(quiz_script(QUIZ_OK), "")
-        self.assertNotIn(blocks.QUIZ_BEGIN, blocks.apply_quiz(without))
-
-    def test_special_pages_get_no_quiz_block(self):
-        text = page("<title>T</title>", quiz_script(QUIZ_OK))
-        self.assertNotIn(blocks.QUIZ_BEGIN, blocks.apply_generated(text, "index.html"))
-        self.assertIn(blocks.QUIZ_BEGIN, blocks.apply_generated(text, "memo.html"))
-
-    def test_quiz_assets_exist(self):
-        self.assertTrue(blocks.QUIZ_CSS.is_file())
-        self.assertTrue(blocks.QUIZ_JS.is_file())
+    def test_lint_fix_reports_removal(self):
+        text = page("<title>T</title>", LEGACY_QUIZ)
+        fixed, notes, _ = lint.lint_text(text, backlink=False, filename="memo.html")
+        self.assertNotIn("memo-quiz", fixed)
+        self.assertTrue(any("クイズ" in n for n in notes))
+        self.assertFalse(any("クイズ" in n for n in lint.lint_text(fixed, False, "memo.html")[1]))
 
 
 class LintTest(unittest.TestCase):
@@ -293,10 +257,10 @@ class MarkdownTest(unittest.TestCase):
 <table><tr><th>A</th><th>B</th></tr><tr><td>1</td><td>2</td></tr></table>
 <pre>code
   line</pre>
-""" + blocks.BACKLINK + quiz_script([{"q": "秘密の問題", "choices": ["a", "b"], "answer": 0}]))
+""" + blocks.BACKLINK + LEGACY_QUIZ)
 
     def test_converts_body(self):
-        md = markdown.html_to_markdown(blocks.apply_quiz(self.HTML), "https://ex.com/p.html")
+        md = markdown.html_to_markdown(self.HTML, "https://ex.com/p.html")
         self.assertIn("## 見出し", md)
         self.assertIn("**強調**", md)
         self.assertIn("`c`", md)
@@ -323,50 +287,20 @@ class MarkdownTest(unittest.TestCase):
         self.assertIn(f"- [T]({config.SITE_URL}md/p.md): D（a, b / 2026-01-01）", txt)
 
 
-class _TagCounter(HTMLParser):
-    def __init__(self) -> None:
-        super().__init__()
-        self.starts: dict[str, int] = {}
-
-    def handle_starttag(self, tag, attrs):
-        self.starts[tag] = self.starts.get(tag, 0) + 1
-
-
 class SiteTest(unittest.TestCase):
     def test_json_writers(self):
         memos = [{"file": "a.html", "title": "A", "desc": "", "tags": [], "date": "2026-01-01"},
                  {"file": "b.html", "title": "B", "desc": "", "tags": [], "date": "2026-01-01"}]
-        quizzes = [{"file": "a.html", "q": "Q"}, {"file": "a.html", "q": "Q2"}]
-        rows = json.loads(site.memos_json(memos, quizzes))
-        self.assertEqual([r["quizzes"] for r in rows], [2, 0])
-        self.assertEqual(json.loads(site.quizzes_json(quizzes)), quizzes)
-        self.assertEqual(site.quizzes_json([]), "[]\n")
-        self.assertEqual(site.quizzes_json(quizzes).count("\n"), 4, "1 問 1 行")
+        self.assertEqual(json.loads(site.memos_json(memos)), memos)
 
     def test_strip_fence(self):
         self.assertEqual(site.strip_fence("```html\n<p>x</p>\n```"), "<p>x</p>")
         self.assertEqual(site.strip_fence("<p>x</p>"), "<p>x</p>")
         self.assertEqual(site.strip_fence("```\nnot html\n```"), "```\nnot html\n```")
 
-    def test_preview_inlines_assets_and_escapes_closing_tags(self):
-        text = page("<title>T</title>", '<h2 id="s">S</h2>' + quiz_script(QUIZ_OK))
-        out = site.preview_text(text, "t.html")
-        self.assertNotIn(blocks.QUIZ_CSS_TAG, out)
-        self.assertNotIn(blocks.QUIZ_JS_TAG, out)
-        # ブラウザと同じく <script> の中身は解釈せずに数える。埋め込んだ JS が途中でタグを閉じていれば数が増える
-        counter = _TagCounter()
-        counter.feed(out)
-        self.assertEqual(counter.starts.get("script"), 2)  # 埋め込んだクイズの JS と問題データ
-        self.assertIn(blocks.QUIZ_JS.read_text(encoding="utf-8").strip()[:40], out)
-
-    def test_inline_tag_escapes_its_closing_tag(self):
-        self.assertEqual(site._inline_tag("script", "a</script>b"), "<script>\na<\\/script>b\n</script>")
-
-    @unittest.skipUnless(helpers.repo_has_memos(), "本物のメモがない（仕組みだけのリポジトリ）")
-    def test_collect_quizzes_from_repository_are_valid(self):
-        qs = site.collect_quizzes(site.site_data()[0])
-        self.assertTrue(qs)
-        self.assertEqual(blocks.validate_quiz(qs and [{k: q[k] for k in ("q", "choices", "answer")} for q in qs]), [])
+    def test_memo_preview_is_the_generated_page(self):
+        text = page("<title>T</title>", "<p>本文</p>")
+        self.assertEqual(site.preview_text(text, "t.html"), blocks.apply_generated(text, "t.html"))
 
 
 class SiteFieldsTest(unittest.TestCase):

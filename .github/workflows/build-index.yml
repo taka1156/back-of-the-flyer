@@ -1,7 +1,7 @@
 name: Build MEMO index
 
-# メモ（docs/*.html）が push されたら、一覧データ（memos.json・quizzes.json）・Markdown 版と
-# 各ページの自動生成ブロック（アイコン・OGP・クイズ表示）を再生成してコミットする。
+# メモ（docs/*.html）が push されたら、一覧データ（memos.json）・Markdown 版と
+# 各ページの自動生成ブロック（アイコン・OGP）を再生成してコミットする。
 # GitHub の画面から HTML を直接アップロードしても一覧に載る。
 # 動くのはデフォルトブランチへの push だけ（ブランチ名は書かない。フォークしても main / master どちらでも動く）。
 on:
@@ -11,8 +11,7 @@ on:
       - "docs/CNAME" # ドメインが変わったら OGP の URL も更新
       - "scripts/**" # memo.py と memolib/
       - "docs/assets/og.png" # 差し替えたら og:image の ?v= を更新
-      - "docs/index.html" # トップ・クイズページのサイト名などの差し込み
-      - "docs/quiz.html"
+      - "docs/index.html" # トップページのサイト名などの差し込み
       - "memo.config.json" # サイト名・リポジトリ・ブランチを変えたら差し込み直す
   workflow_dispatch:
 
@@ -39,7 +38,7 @@ jobs:
 
       - name: Lint memos (report only)
         run: |
-          memos=$(ls docs/*.html | grep -v -e '/index.html$' -e '/quiz.html$' || true)
+          memos=$(ls docs/*.html | grep -v -e '/index.html$' || true)
           if [ -z "$memos" ]; then
             echo "メモがまだないので lint は省略"
           else

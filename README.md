@@ -3,8 +3,7 @@
 Claude に作ってもらった図解つきの解説ページ（HTML）を、GitHub Pages で公開・蓄積するためのキットです。
 このリポジトリは **テンプレートリポジトリ** なので、「Use this template」から自分のリポジトリを作って使います。
 
-- トップページ: `docs/index.html`（メモ一覧・検索・タグ絞り込み・ランダムクイズ）
-- クイズページ: `docs/quiz.html`（ランダム 10 問・カテゴリ別 10 問。最後にスコアと正答一覧、本文へのリンク）
+- トップページ: `docs/index.html`（メモ一覧・検索・タグ絞り込み）
 - AI 向けの Markdown 版: `docs/md/` と `docs/llms.txt`（公開 URL を渡せば、リポジトリを繋いでいない会話でも Claude が過去のメモを読める）
 - 設定: `memo.config.json`（サイト名・説明・リポジトリ・ブランチ・タイムゾーン・アイコンと OGP 画像。コードやスキルには直接書かない）
 - 公開 URL: `docs/CNAME` があればその独自ドメイン、なければ `https://<owner>.github.io/<name>/`（`python3 scripts/memo.py url` で確認できます。OGP の URL もここから自動で決まります）
@@ -15,7 +14,7 @@ Claude に作ってもらった図解つきの解説ページ（HTML）を、Git
 
 > [!WARNING]
 > **GitHub Pages で公開すると、メモはインターネット上の誰でも読めます。**
-> - `docs/` のページ（各メモ・一覧・クイズ）に加えて、AI 向けの Markdown 版（`docs/md/`・`llms.txt`）も公開され、検索エンジンや AI に読まれることがあります。
+> - `docs/` のページ（各メモ・一覧）に加えて、AI 向けの Markdown 版（`docs/md/`・`llms.txt`）も公開され、検索エンジンや AI に読まれることがあります。
 > - GitHub の無料プランでは Pages は公開リポジトリでしか使えないため、リポジトリ（メモの原本・コミット履歴・設定）も公開になります。
 > - 「さっきの説明をメモにして」（`memo-from-chat`）は会話の内容をそのままページにします。社外秘の情報・個人情報・認証情報などを含む会話はメモにしないでください。
 > - 一度公開した内容は、消してもコミット履歴やキャッシュ、第三者の保存に残ることがあります。
@@ -29,8 +28,8 @@ GitHub でこのリポジトリの「Use this template」→「Create a new repo
 ### 2. サンプルを消す
 
 ```bash
-find docs -maxdepth 1 -name '*.html' ! -name index.html ! -name quiz.html -delete   # サンプルのメモ
-rm -rf docs/md docs/memos.json docs/quizzes.json docs/llms.txt entry-skill            # 生成物（build で作り直す）
+find docs -maxdepth 1 -name '*.html' ! -name index.html -delete   # サンプルのメモ
+rm -rf docs/md docs/memos.json docs/llms.txt entry-skill            # 生成物（build で作り直す）
 ```
 
 ### 3. `memo.config.json` を書き換える
@@ -51,7 +50,7 @@ rm -rf docs/md docs/memos.json docs/quizzes.json docs/llms.txt entry-skill      
 - `branch` はリポジトリのデフォルトブランチ（スキルの push 先）。
 - 書き間違い（JSON の書式・型・範囲）は、`memo.py` を実行したときにどの項目をどう直すかを示して止まります。
 - `branding` はサイト全体のアクセント色と、アイコン・OGP 画像の文字・色です。
-  - `accent` はダークモード、`accent_light` はライトモードのアクセント色。全ページ（トップ・クイズ・各メモ）に `build` が反映し、画像にも同じ色を使います。`accent_light` を省くと、`accent` を白地で読める濃さまで自動で暗くします。
+  - `accent` はダークモード、`accent_light` はライトモードのアクセント色。全ページ（トップ・各メモ）に `build` が反映し、画像にも同じ色を使います。`accent_light` を省くと、`accent` を白地で読める濃さまで自動で暗くします。
   - `title`・`tagline`・`url`・`mark`・`theme` は画像用。空欄はサイト名・説明・公開 URL から埋まります。項目の説明は [memo-detail.md の「サイトごとの設定」](memo-detail.md#サイトごとの設定memoconfigjson) にあります。
 
 ### 4. 作り直して確かめる
@@ -120,6 +119,6 @@ python3 -B -m unittest discover -s tests   # テスト
 
 ## 仕組みと memo.py
 
-ファイルの構成（原本と生成物）、`scripts/memo.py` の各コマンド、自動生成ブロック、確認クイズのデータの流れ、AI 向けの Markdown 版（`llms.txt`）、サイトごとの設定（`memo.config.json`）、表示の確認とプレビュー、GitHub Actions は、図つきで [memo-detail.md](memo-detail.md) にまとめています。
+ファイルの構成（原本と生成物）、`scripts/memo.py` の各コマンド、自動生成ブロック、AI 向けの Markdown 版（`llms.txt`）、サイトごとの設定（`memo.config.json`）、表示の確認とプレビュー、GitHub Actions は、図つきで [memo-detail.md](memo-detail.md) にまとめています。
 
 メモ（中身）と仕組みは分けてあり、仕組みは本物のメモがなくても動きます（テストは `tests/fixtures/` のサンプルで動く）。残すもの・消すものの一覧は [memo-detail.md の「このキットから始める」](memo-detail.md#このキットから始める) にあります。

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>サンプルのメモ</title>
-<meta name="description" content="テスト用のサンプル。クイズと別メモへのリンクを含む">
+<meta name="description" content="テスト用のサンプル。図と別メモへのリンクを含む">
 <meta name="memo:tags" content="サンプル, テスト">
 <meta name="memo:date" content="2026-01-10">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Noto+Sans+JP:wght@400;500;700&display=swap">
@@ -119,7 +119,7 @@ footer#memo-backlink a:hover { color: var(--accent); }
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="MemoKit">
 <meta property="og:title" content="サンプルのメモ">
-<meta property="og:description" content="テスト用のサンプル。クイズと別メモへのリンクを含む">
+<meta property="og:description" content="テスト用のサンプル。図と別メモへのリンクを含む">
 <meta property="og:url" content="https://repo.github.io/sample/sample.html">
 <meta property="og:image" content="https://repo.github.io/sample/assets/og.png?v=258752a2">
 <meta property="og:image:width" content="1200">
@@ -136,7 +136,7 @@ footer#memo-backlink a:hover { color: var(--accent); }
   <div class="card summary">
     <strong>ざっくり言うと</strong>
     <ul>
-      <li>見出しと図とクイズがある</li>
+      <li>見出しと図がある</li>
       <li><a href="sample-plain.html#overview">もう 1 本のメモ</a>へリンクしている</li>
     </ul>
   </div>
@@ -151,17 +151,7 @@ footer#memo-backlink a:hover { color: var(--accent); }
     <li>meta で一覧の情報を付ける</li>
   </ul>
 
-  <!-- memo:quiz（scripts/memo.py が自動生成。手で編集しない） -->
-<link rel="stylesheet" href="assets/memo-quiz.css">
-<section id="memo-quiz-ui" hidden aria-labelledby="memo-quiz-title">
-<h2 id="memo-quiz-title">確認クイズ <small></small></h2>
-<div class="mq-list"></div>
-<div class="mq-result" hidden aria-live="polite"></div>
-<button type="button" class="mq-reset">やり直す</button>
-</section>
-<script src="assets/memo-quiz.js" defer></script>
-<!-- /memo:quiz -->
-<footer id="memo-backlink"><a href="index.html">&larr; 一覧に戻る</a></footer>
+  <footer id="memo-backlink"><a href="index.html">&larr; 一覧に戻る</a></footer>
 </div>
 
 <script>
@@ -178,40 +168,5 @@ document.querySelectorAll('.tabs').forEach(group => {
 });
 </script>
 
-<script type="application/json" id="memo-quiz">
-[
-  {
-    "q": "一覧データを作るコマンドは？",
-    "choices": [
-      "lint",
-      "build",
-      "url"
-    ],
-    "answer": 1,
-    "explain": "build が memos.json などを生成する。",
-    "ref": "#intro"
-  },
-  {
-    "q": "新しいメモを作るコマンドは？",
-    "choices": [
-      "new",
-      "list",
-      "path"
-    ],
-    "answer": 0,
-    "ref": "#usage"
-  },
-  {
-    "q": "一覧の情報を付けるコマンドは？",
-    "choices": [
-      "preview",
-      "add",
-      "meta"
-    ],
-    "answer": 2,
-    "ref": "#usage"
-  }
-]
-</script>
 </body>
 </html>

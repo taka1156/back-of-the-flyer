@@ -8,7 +8,7 @@
 付けたときは、tests/fixtures/ のサンプルのメモで実行する。
 
 - 自動生成ブロックと生成物をすべて消してから build（docs/ 全体を build/ に保存）
-- 全メモの lint と preview、index / quiz の preview
+- 全メモの lint と preview、index の preview
 - 壊れた下書きの lint --fix と preview、new / add / meta / path / url / list
 
 変更の前と後で 1 回ずつ実行し、`diff -r 前 後` で何も出なければ出力は変わっていない。
@@ -49,9 +49,8 @@ def main(out: Path, fixtures: bool) -> None:
         for page in ws.docs.glob("*.html"):
             text = page.read_text(encoding="utf-8")
             text = re.sub(r"<!-- memo:head.*?<!-- /memo:head -->\n?", "", text, flags=re.S)
-            text = re.sub(r"<!-- memo:quiz.*?<!-- /memo:quiz -->\n?", "", text, flags=re.S)
             page.write_text(text, encoding="utf-8")
-        for name in ("memos.json", "quizzes.json", "llms.txt"):
+        for name in ("memos.json", "llms.txt"):
             (ws.docs / name).unlink()
         for md in (ws.docs / "md").glob("*.md"):
             md.unlink()
@@ -67,8 +66,7 @@ def main(out: Path, fixtures: bool) -> None:
         for n in names:
             run("lint", n)
             run("preview", n, "-o", str(out / "preview" / f"{n}.html"))
-        for n in ("index", "quiz"):
-            run("preview", n, "-o", str(out / "preview" / f"{n}.html"))
+        run("preview", "index", "-o", str(out / "preview" / "index.html"))
 
         draft = ws.root / "draft.html"
         draft.write_text(BROKEN_DRAFT, encoding="utf-8")
