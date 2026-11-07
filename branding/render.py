@@ -1,4 +1,4 @@
-"""branding/ の HTML から docs/assets/ の OGP 画像とアイコンを生成する。
+"""branding/ の HTML から src/assets/ の OGP 画像とアイコンを生成する。
 
     python3 branding/render.py
 

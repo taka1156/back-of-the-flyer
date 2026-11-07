@@ -7,20 +7,19 @@
 リポジトリ自体は書き換えない。本物のメモがないとき（仕組みだけのリポジトリ）や --fixtures を
 付けたときは、tests/fixtures/ のサンプルのメモで実行する。
 
-- 自動生成ブロックと生成物をすべて消してから build（docs/ 全体を build/ に保存）
-- 全メモの lint と preview、index の preview
+- dist/ を消してから build（dist/ 全体を build/ に保存）
+- 全メモの lint と preview、index / roadmap の preview
 - 壊れた下書きの lint --fix と preview、new / add / meta / path / url / list
 
 変更の前と後で 1 回ずつ実行し、`diff -r 前 後` で何も出なければ出力は変わっていない。
 """
 from __future__ import annotations
 
-import re
 import shutil
 import sys
 from pathlib import Path
 
-from helpers import ENTRY_REL, Workspace, repo_has_memos
+from helpers import Workspace, repo_has_memos
 
 BROKEN_DRAFT = (
     "<html><head><title>T</title>"
@@ -46,27 +45,19 @@ def main(out: Path, fixtures: bool) -> None:
             log.append(f"$ memo.py {norm(' '.join(args))}  [exit {p.returncode}]\n{norm(p.stdout + p.stderr)}")
             return p.stdout
 
-        for page in ws.docs.glob("*.html"):
-            text = page.read_text(encoding="utf-8")
-            text = re.sub(r"<!-- memo:head.*?<!-- /memo:head -->\n?", "", text, flags=re.S)
-            page.write_text(text, encoding="utf-8")
-        for name in ("memos.json", "llms.txt"):
-            (ws.docs / name).unlink()
-        for md in (ws.docs / "md").glob("*.md"):
-            md.unlink()
-        (ws.root / ENTRY_REL).unlink(missing_ok=True)
+        shutil.rmtree(ws.dist, ignore_errors=True)
         run("build")
         run("build", "--check")
         run("list")
-        shutil.copytree(ws.docs, out / "build")
-        shutil.copy(ws.root / ENTRY_REL, out / "entry-skill.md")
+        shutil.copytree(ws.dist, out / "build")
 
         names = ws.memo_names()
         first = names[0]  # add / path / url を試すメモ
         for n in names:
             run("lint", n)
             run("preview", n, "-o", str(out / "preview" / f"{n}.html"))
-        run("preview", "index", "-o", str(out / "preview" / "index.html"))
+        for n in ("index", "roadmap"):
+            run("preview", n, "-o", str(out / "preview" / f"{n}.html"))
 
         draft = ws.root / "draft.html"
         draft.write_text(BROKEN_DRAFT, encoding="utf-8")
@@ -76,9 +67,9 @@ def main(out: Path, fixtures: bool) -> None:
         run("preview", str(draft), "-o", str(out / "draft-preview.html"))
 
         run("new", "zz-new")
-        run("add", str(ws.docs / f"{first}.html"), "zz-add")
+        run("add", str(ws.src / f"{first}.html"), "zz-add")
         run("meta", "zz-add", "--title", "T <x>", "--desc", 'D "q"', "--tags", " a, b ,,", "--date", "2026-01-02")
-        shutil.copy(ws.docs / "zz-add.html", out / "meta.html")
+        shutil.copy(ws.src / "zz-add.html", out / "meta.html")
         run("lint", "zz-new")
         for args in (("path", first), ("path", first, "--md"), ("url", first), ("url",),
                      ("new", "index"), ("new", "Bad_Name"), ("config",)):

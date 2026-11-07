@@ -1,6 +1,8 @@
 """置き場所・公開 URL・日付など、リポジトリ全体で共有する設定。
 
-置き場所（docs/ やテンプレートの場所）を知っているのはこのモジュールだけ。
+置き場所（src/・dist/ やテンプレートの場所）を知っているのはこのモジュールだけ。
+src/ は原本（手で書く HTML と共通ファイル）だけを置く場所で、build は src/ を読むだけで書き換えない。
+build の出力（公開するサイト一式）は dist/ に書き出す（.gitignore 済み。Actions が dist ブランチにデプロイする）。
 サイトごとに変わる値（サイト名・リポジトリ・ブランチ・タイムゾーンなど）は
 リポジトリ直下の memo.config.json に書き、ここで読み込む。コードやスキルに直接書かない。
 """
@@ -14,11 +16,16 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent.parent  # scripts/memolib/ の 2 つ上
 CONFIG_FILE = ROOT / "memo.config.json"
-DOCS = ROOT / "docs"  # GitHub Pages の公開元
-INDEX = DOCS / "index.html"
+SRC = ROOT / "src"  # 原本の置き場所（build は読むだけ）
+DIST = ROOT / "dist"  # build の出力。公開するサイト一式（GitHub Pages は dist ブランチから公開）
+INDEX = SRC / "index.html"
+ROADMAP_PAGE = SRC / "roadmap.html"  # 書いたメモ・これから書くテーマのチェックリスト（memos.json で自動でチェック）
 # メモではない特別なページ（一覧に載せない・メモ名に使えない）。一覧データは memos.json から読み込む
-SPECIAL_PAGES = (INDEX,)
+SPECIAL_PAGES = (INDEX, ROADMAP_PAGE)
 SPECIAL_NAMES = {p.name for p in SPECIAL_PAGES}
+# 使うかどうかを memo.config.json で選ぶページ（{ファイル名: 設定の項目}）。オフのときは build が dist/ に出さず、
+# ほかのページの data-memo-if="項目" の付いた要素（リンクなど）も取り除く
+OPTIONAL_PAGES = {ROADMAP_PAGE.name: "roadmap"}
 
 # memo.config.json の項目と、書かれていないときの値
 DEFAULTS: dict = {
@@ -27,8 +34,10 @@ DEFAULTS: dict = {
     "llms_description": "",       # llms.txt の冒頭の説明
     "repository": "",             # GitHub の owner/name。公開 URL の既定値とリンクに使う
     "branch": "main",             # push 先のブランチ（スキルは `memo.py config branch` で読む）
+    "deploy_branch": "dist",      # build の出力（dist/）をデプロイするブランチ。GitHub Pages の公開元にする
     "utc_offset_hours": 0,        # 「今日」を決めるタイムゾーン（日本なら 9）
     "branding": {},               # アクセント色と、アイコン・OGP 画像の文字・色。項目は BRANDING_DEFAULTS
+    "roadmap": False,             # ロードマップ（src/roadmap.html）を公開して、トップページからリンクするか（オプション）
 }
 
 # memo.config.json の "branding" の項目。空文字は「ほかの設定から決める」
@@ -46,8 +55,9 @@ HEX_RE = re.compile(r"^#(?:[0-9a-fA-F]{3}){1,2}$")
 
 
 # 文字列の項目と、空を許さないもの
-STRING_KEYS = ("site_name", "description", "llms_description", "repository", "branch")
-REQUIRED_STRINGS = ("site_name", "branch")
+STRING_KEYS = ("site_name", "description", "llms_description", "repository", "branch", "deploy_branch")
+BOOL_KEYS = ("roadmap",)
+REQUIRED_STRINGS = ("site_name", "branch", "deploy_branch")
 BRANDING_STRING_KEYS = ("title", "tagline", "url", "mark", "accent", "accent_light", "theme")
 
 
@@ -81,11 +91,17 @@ def load_config(path: Path = CONFIG_FILE) -> dict:
     for key in STRING_KEYS:
         if key in data and not isinstance(data[key], str):
             fail(f"{key} は文字列（\"...\"）で書いてください（いまは{_type_name(data[key])}）")
+    for key in BOOL_KEYS:
+        if key in data and not isinstance(data[key], bool):
+            fail(f"{key} は true か false で書いてください（いまは{_type_name(data[key])}）")
     for key in REQUIRED_STRINGS:
         if key in data and not data[key].strip():
             fail(f"{key} を空にはできません（書かなければ既定値 {DEFAULTS[key]!r} になります）")
-    if "branch" in data and re.search(r"\s", data["branch"]):
-        fail(f"branch に空白は使えません: {data['branch']!r}")
+    for key in ("branch", "deploy_branch"):
+        if key in data and re.search(r"\s", data[key]):
+            fail(f"{key} に空白は使えません: {data[key]!r}")
+    if data.get("deploy_branch", DEFAULTS["deploy_branch"]) == data.get("branch", DEFAULTS["branch"]):
+        fail("deploy_branch は branch と別のブランチにしてください（原本と build の出力を分けるため）")
     if "utc_offset_hours" in data:
         tz = data["utc_offset_hours"]
         if isinstance(tz, bool) or not isinstance(tz, (int, float)):
@@ -153,6 +169,12 @@ def repository_warning(repository: str = REPOSITORY) -> str:
             "自分のリポジトリ（owner/name）に書き換えてください")
 
 
+def page_enabled(name: str, cfg: dict | None = None) -> bool:
+    """そのページを公開するか。オプションのページ（OPTIONAL_PAGES）は memo.config.json の項目で決まり、ほかは常に公開する。"""
+    key = OPTIONAL_PAGES.get(name)
+    return True if key is None else bool((cfg or CONFIG)[key])
+
+
 def today() -> str:
     return dt.datetime.now(TZ).date().isoformat()
 
@@ -168,8 +190,8 @@ def pages_url(repository: str) -> str:
 
 
 def site_url() -> str:
-    """公開 URL（末尾 /）。docs/CNAME があればその独自ドメイン、なければ GitHub Pages の URL。"""
-    cname = DOCS / "CNAME"
+    """公開 URL（末尾 /）。src/CNAME があればその独自ドメイン、なければ GitHub Pages の URL。"""
+    cname = SRC / "CNAME"
     if cname.is_file():
         lines = cname.read_text(encoding="utf-8").strip().splitlines()
         if lines and lines[0].strip():
@@ -234,7 +256,7 @@ def branding(cfg: dict | None = None, url: str | None = None) -> dict:
 def asset_version(name: str) -> str:
     """画像の中身から短いハッシュを作る。画像を差し替えると URL が変わり、
     Discord などの画像キャッシュが古いまま残るのを防ぐ。"""
-    f = DOCS / "assets" / name
+    f = SRC / "assets" / name
     return hashlib.sha256(f.read_bytes()).hexdigest()[:8] if f.is_file() else ""
 
 
@@ -245,5 +267,6 @@ HEAD_RE = re.compile(r"<!-- memo:head.*?<!-- /memo:head -->\n?", re.S)
 TEMPLATE = ROOT / ".claude" / "skills" / "memo-style" / "template.html"
 NAME_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 
-# claude.ai のアプリ側に置く入口スキル（build が memo.config.json から生成する）
-ENTRY_SKILL = ROOT / "entry-skill" / "SKILL.md"
+ASSETS = SRC / "assets"  # アイコン・OGP 画像の置き場所（branding/render.py が書き出す）
+# claude.ai のアプリ側に置く入口スキル（build が memo.config.json から dist/ に生成する）
+ENTRY_SKILL = DIST / "entry-skill" / "SKILL.md"

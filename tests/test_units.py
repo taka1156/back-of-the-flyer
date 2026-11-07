@@ -31,7 +31,7 @@ class ConfigTest(unittest.TestCase):
         self.assertEqual(config.today(), dt.datetime.now(tz).date().isoformat())
 
     def test_site_url_comes_from_cname_or_repository(self):
-        cname = config.DOCS / "CNAME"
+        cname = config.SRC / "CNAME"
         if cname.is_file():
             self.assertEqual(config.SITE_URL, f"https://{cname.read_text(encoding='utf-8').strip()}/")
         else:
@@ -72,6 +72,9 @@ class ConfigTest(unittest.TestCase):
             '{"repository": null}': "repository は文字列",
             '{"branding": {"mark": 1}}': "branding.mark は文字列",
             '{"sitename": "x"}': "使える項目",
+            '{"roadmap": "yes"}': "roadmap は true か false",
+            '{"roadmap": 1}': "roadmap は true か false",
+            '{"deploy_branch": "main"}': "別のブランチ",
         }
         with tempfile.TemporaryDirectory() as d:
             f = Path(d) / "memo.config.json"
@@ -87,6 +90,27 @@ class ConfigTest(unittest.TestCase):
             self.assertIn("UTF-8", str(cm.exception))
             f.write_text('{"utc_offset_hours": -3.5, "branch": "trunk"}', encoding="utf-8")
             self.assertEqual(config.load_config(f)["utc_offset_hours"], -3.5)  # 小数・負の数は使える
+
+    def test_names_used_by_branding_render_exist(self):
+        """branding/render.py（標準ライブラリだけでは動かないのでテストで実行しない）が import する名前が config にあること。"""
+        import re
+        src = (helpers.REPO / "branding" / "render.py").read_text(encoding="utf-8")
+        names = re.search(r"from memolib\.config import ([\w, ]+)", src).group(1).split(", ")
+        for name in names:
+            self.assertTrue(hasattr(config, name.strip()), name)
+        self.assertEqual(config.ASSETS, config.SRC / "assets")
+
+    def test_optional_pages_follow_config(self):
+        self.assertFalse(config.page_enabled("roadmap.html", {**config.DEFAULTS}))
+        self.assertTrue(config.page_enabled("roadmap.html", {**config.DEFAULTS, "roadmap": True}))
+        self.assertTrue(config.page_enabled("index.html", {**config.DEFAULTS}))  # オプションでないページは常に出す
+        self.assertTrue(set(config.OPTIONAL_PAGES) <= config.SPECIAL_NAMES)
+        self.assertTrue(set(config.OPTIONAL_PAGES.values()) <= set(config.DEFAULTS))
+
+    def test_output_paths_are_under_dist(self):
+        for path in (site.MEMOS_JSON, markdown.MD_DIR, markdown.LLMS_TXT, config.ENTRY_SKILL):
+            self.assertTrue(path.is_relative_to(config.DIST), path)  # 生成物はすべて dist/ に書く
+            self.assertFalse(path.is_relative_to(config.SRC), path)
 
     def test_read_text_reports_non_utf8_file(self):
         import tempfile
@@ -166,8 +190,8 @@ class MetaTest(unittest.TestCase):
         self.assertLess(text.index('name="description"'), text.index("</head>"))
 
     def test_memo_path_resolves_names(self):
-        target = config.DOCS / "sample.html"
-        for arg in ("sample", "sample.html", "docs/sample.html"):
+        target = config.SRC / "sample.html"
+        for arg in ("sample", "sample.html", "src/sample.html"):
             self.assertEqual(meta.memo_path(arg, must_exist=False), target)
 
     def test_memo_path_rejects_reserved_and_bad_names(self):
@@ -214,12 +238,18 @@ class LegacyQuizTest(unittest.TestCase):
         text = page("<title>T</title>", LEGACY_QUIZ)
         self.assertNotIn("memo-quiz", blocks.apply_generated(text, "memo.html"))
 
-    def test_lint_fix_reports_removal(self):
-        text = page("<title>T</title>", LEGACY_QUIZ)
-        fixed, notes, _ = lint.lint_text(text, backlink=False, filename="memo.html")
+    def test_strip_generated_undoes_apply_generated(self):
+        text = page("<title>T</title>", "<p>本文</p>\n")
+        self.assertEqual(blocks.strip_generated(blocks.apply_generated(text, "memo.html")), text)
+        self.assertEqual(blocks.strip_generated(text + LEGACY_QUIZ), text)
+
+    def test_lint_fix_removes_generated_blocks_and_quiz(self):
+        text = blocks.apply_head(page("<title>T</title>", LEGACY_QUIZ), "memo.html")
+        fixed, notes, _ = lint.lint_text(text, backlink=False)
         self.assertNotIn("memo-quiz", fixed)
-        self.assertTrue(any("クイズ" in n for n in notes))
-        self.assertFalse(any("クイズ" in n for n in lint.lint_text(fixed, False, "memo.html")[1]))
+        self.assertNotIn(config.HEAD_BEGIN, fixed)
+        self.assertTrue(any("自動生成ブロック" in n for n in notes))
+        self.assertEqual(lint.lint_text(fixed, False)[1], [])  # 2 回目は直すものがない
 
 
 class LintTest(unittest.TestCase):
@@ -332,6 +362,24 @@ class SiteFieldsTest(unittest.TestCase):
             out = blocks.apply_site('<h1 data-memo-site="{site_name}">x</h1><meta content="" data-memo-site-content="{site_name}">')
             self.assertIn('>A &amp; "B" &lt;C&gt;</h1>', out)
             self.assertIn('content="A &amp; &quot;B&quot; &lt;C&gt;"', out)
+        finally:
+            blocks.CONFIG.clear()
+            blocks.CONFIG.update(orig)
+
+    def test_optional_elements_are_removed_only_when_off(self):
+        src = ('<footer>\n    <a href="a.html">A</a>\n'
+               '    <span data-memo-if="roadmap">· <a href="roadmap.html">ロードマップ</a></span>\n'
+               '    · <a href="b.html">B</a>\n</footer>')
+        orig = dict(blocks.CONFIG)
+        try:
+            blocks.CONFIG["roadmap"] = False
+            out = blocks.apply_site(src)
+            self.assertEqual(out, '<footer>\n    <a href="a.html">A</a>\n    · <a href="b.html">B</a>\n</footer>')
+            self.assertEqual(blocks.apply_site(out), out)
+            blocks.CONFIG["roadmap"] = True
+            self.assertEqual(blocks.apply_site(src), src)  # オンなら何も変えない
+            with self.assertRaises(SystemExit):
+                blocks.apply_site('<span data-memo-if="nope">x</span>')
         finally:
             blocks.CONFIG.clear()
             blocks.CONFIG.update(orig)

@@ -1,0 +1,77 @@
+name: Deploy MEMO
+
+# 原本（src/・scripts/・memo.config.json）が push されたら、build で公開用のサイト一式を dist/ に書き出し、
+# その中身をそのまま dist ブランチ（memo.config.json の deploy_branch）にコミットする。GitHub Pages はそのブランチから公開する。
+# 原本のブランチ（main など）には何もコミットしない（自動生成ブロックや一覧データは原本に入らない）。
+# GitHub の画面から HTML を直接アップロードしても、ここで一覧に載って公開される。
+# 動くのはデフォルトブランチへの push だけ（ブランチ名は書かない。フォークしても main / master どちらでも動く）。
+on:
+  push:
+    paths:
+      - "src/**" # メモ・トップ・共通ファイル・画像・CNAME
+      - "scripts/**" # memo.py と memolib/
+      - "memo.config.json" # サイト名・リポジトリ・ブランチ・アクセント色・ロードマップ
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# 続けて push されたときに 2 つのデプロイが同時に走らないよう、1 本ずつ順番に動かす（途中で止めない）
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # push なら push されたコミット、手動実行ならデフォルトブランチの最新
+          ref: ${{ github.event_name == 'push' && github.sha || github.event.repository.default_branch }}
+          fetch-depth: 0 # memo:date がないメモの日付を git 履歴から推定するため
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Lint memos (report only)
+        run: |
+          memos=$(ls src/*.html | grep -v -e '/index.html$' -e '/roadmap.html$' || true)
+          if [ -z "$memos" ]; then
+            echo "メモがまだないので lint は省略"
+          else
+            python3 scripts/memo.py lint $memos || true
+          fi
+
+      - name: Build
+        run: python3 scripts/memo.py build
+
+      - name: Commit dist/ to the deploy branch
+        # dist/ の中身でデプロイ用ブランチを丸ごと置き換えてコミットする（履歴は残すので、生成物の変化も追える）。
+        # ブランチがまだなければ、履歴のない（orphan）ブランチとして作る。
+        run: |
+          deploy_branch="$(python3 scripts/memo.py config deploy_branch)"
+          source_sha="$(git rev-parse --short HEAD)"
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          out="${RUNNER_TEMP}/deploy"
+          if git ls-remote --exit-code --heads origin "${deploy_branch}" >/dev/null; then
+            git fetch -q --depth 1 origin "${deploy_branch}"
+            git worktree add -q --detach "${out}" FETCH_HEAD
+          else
+            git worktree add -q --detach "${out}"
+            git -C "${out}" checkout -q --orphan "${deploy_branch}"
+          fi
+          git -C "${out}" rm -rqf --ignore-unmatch .
+          cp -a dist/. "${out}/"
+          git -C "${out}" add -A
+          if git -C "${out}" diff --cached --quiet; then
+            echo "公開中のサイトは最新です"
+            exit 0
+          fi
+          git -C "${out}" commit -q -m "Deploy ${source_sha}"
+          git -C "${out}" push -q origin "HEAD:refs/heads/${deploy_branch}"
+          echo "### ${deploy_branch} ブランチにデプロイしました（元のコミット: ${source_sha}）" >> "$GITHUB_STEP_SUMMARY"

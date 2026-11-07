@@ -2,31 +2,33 @@
 """MEMO リポジトリ用ツール（標準ライブラリのみ）。仕組みの解説はリポジトリ直下の memo-detail.md
 
 使い方（どのディレクトリから実行してもよい）:
-  python3 scripts/memo.py new   NAME                  テンプレートから docs/NAME.html を作る
-  python3 scripts/memo.py add   SRC NAME [--force]    外部の HTML を docs/NAME.html として取り込む
-  python3 scripts/memo.py path  NAME [--md]           docs/NAME.html（--md なら Markdown 版）の絶対パスを表示
-  python3 scripts/memo.py url   [NAME]                公開 URL を表示（docs/CNAME、なければ GitHub Pages の URL）
+  python3 scripts/memo.py new   NAME                  テンプレートから src/NAME.html を作る
+  python3 scripts/memo.py add   SRC NAME [--force]    外部の HTML を src/NAME.html として取り込む
+  python3 scripts/memo.py path  NAME [--md]           src/NAME.html（--md なら dist/md/NAME.md）の絶対パスを表示
+  python3 scripts/memo.py url   [NAME]                公開 URL を表示（src/CNAME、なければ GitHub Pages の URL）
   python3 scripts/memo.py lint  MEMO... [--fix] [--backlink]
   python3 scripts/memo.py meta  MEMO [--title T] [--desc D] [--tags a,b] [--date YYYY-MM-DD]
-  python3 scripts/memo.py build [--check]
+  python3 scripts/memo.py build [--check]             src/ から公開用のサイト一式を dist/ に書き出す（--check は古いかだけ見る）
   python3 scripts/memo.py list
   python3 scripts/memo.py config [KEY]                memo.config.json の設定を表示（例: config branch）
-  python3 scripts/memo.py preview MEMO|index|FILE [-o OUT]   会話内プレビュー用に 1 枚へ埋め込んだ HTML を作る
+  python3 scripts/memo.py preview MEMO|index|roadmap|FILE [-o OUT]   会話内プレビュー用に 1 枚へ埋め込んだ HTML を作る
 
-MEMO / NAME は「docker」「docker.html」「docs/docker.html」のどれでもよい
+MEMO / NAME は「docker」「docker.html」「src/docker.html」のどれでもよい
 （既存のファイルパスを渡した場合はそのファイルを対象にする）。
-置き場所（docs/）やテンプレートの場所はこのスクリプトだけが知っている。
+置き場所（src/・dist/）やテンプレートの場所はこのスクリプトだけが知っている。
 サイト名・リポジトリ・ブランチ・タイムゾーンなど、サイトごとの値はリポジトリ直下の memo.config.json に書く。
 
-メモ = docs/ 直下の *.html（index.html 以外）。docs/ が GitHub Pages で公開される。
+メモ = src/ 直下の *.html（index.html・roadmap.html 以外）。src/ は原本だけを置く場所で、
+build は src/ を読むだけで書き換えない。公開するのは build が書き出す dist/（Actions が dist ブランチにデプロイする）。
 一覧情報は各メモの <head> 内の次のタグから読み取る:
   <title>                         タイトル（memo:title があればそちら優先）
   <meta name="description">       説明
   <meta name="memo:tags">         カンマ区切りのタグ
   <meta name="memo:date">         YYYY-MM-DD
 
-build は一覧を docs/memos.json に書き出し、トップページはそれを読み込んで表示する。
-あわせて、アプリ（claude.ai）に置く入口スキル entry-skill/SKILL.md も memo.config.json から生成する。
+build は一覧を dist/memos.json、Markdown 版を dist/md/ と dist/llms.txt に書き出し、
+トップページはその一覧を読み込んで表示する。
+あわせて、アプリ（claude.ai）に置く入口スキル dist/entry-skill/SKILL.md も memo.config.json から生成する。
 
 このファイルはコマンドの入口だけで、処理の本体は scripts/memolib/ にある。
 """
@@ -41,21 +43,20 @@ import sys
 import tempfile
 from pathlib import Path
 
-from memolib.blocks import apply_generated
-from memolib.config import (CONFIG, CONFIG_FILE, DOCS, ENTRY_SKILL, ROOT, SITE_URL, SPECIAL_NAMES, SPECIAL_PAGES,
-                            TEMPLATE, read_text, repository_warning, today)
-from memolib.entry import entry_skill
+from memolib.config import (CONFIG, CONFIG_FILE, SRC, ROOT, SITE_URL, SPECIAL_NAMES, TEMPLATE,
+                            read_text, repository_warning, today)
+from memolib.dist import dist_outputs, sync_dist
 from memolib.lint import lint_text
-from memolib.markdown import MD_DIR, build_markdown
+from memolib.markdown import MD_DIR
 from memolib.meta import set_meta, memo_files, memo_path, read_meta
-from memolib.site import MEMOS_JSON, strip_fence, memos_json, preview_text, site_data
+from memolib.site import strip_fence, preview_text
 
 def cmd_lint(args) -> int:
     bad = 0
     for f in args.files:
         path = memo_path(f)
         text = read_text(path)
-        new, fixed, problems = lint_text(text, args.backlink, path.name)
+        new, fixed, problems = lint_text(text, args.backlink)
         print(f"== {path.name}")
         if fixed:
             verb = "修正" if args.fix else "修正可能"
@@ -98,63 +99,32 @@ def cmd_meta(args) -> int:
         except ValueError:
             sys.exit(f"--date の日付がありえない値です: {date}")
         text = set_meta(text, "memo:date", date)
-    path.write_text(apply_generated(text, path.name), encoding="utf-8")
+    path.write_text(text, encoding="utf-8")
     print(json.dumps(read_meta(path), ensure_ascii=False, indent=2))
     return 0
 
 
 def cmd_build(args) -> int:
+    """src/（原本）を読んで、公開するサイト一式を dist/ に書き出す。src/ は書き換えない。"""
     warning = repository_warning()
     if warning:
         print(warning, file=sys.stderr)
-    stale = []
-    for p in memo_files():
-        text = read_text(p)
-        new = apply_generated(text, p.name)
-        if new != text:
-            stale.append(p.name)
-            if not args.check:
-                p.write_text(new, encoding="utf-8")
-    if stale:
-        print(("自動生成ブロックが古い: " if args.check else "自動生成ブロックを更新: ") + ", ".join(stale))
-    memos = site_data()
-    outdated = []
-    body = memos_json(memos)
-    if not MEMOS_JSON.is_file() or read_text(MEMOS_JSON) != body:
-        outdated.append(MEMOS_JSON.name)
-        if not args.check:
-            MEMOS_JSON.write_text(body, encoding="utf-8")
-    for page in SPECIAL_PAGES:  # トップページは head（アイコン・OGP）とサイト設定だけ更新する
-        if not page.is_file():
-            continue
-        src = read_text(page)
-        new = apply_generated(src, page.name)
-        if new != src:
-            outdated.append(page.name)
-            if not args.check:
-                page.write_text(new, encoding="utf-8")
-    md_changed = build_markdown(memos, args.check)
-    entry = entry_skill()
-    entry_changed = not ENTRY_SKILL.is_file() or ENTRY_SKILL.read_text(encoding="utf-8") != entry
-    if entry_changed and not args.check:
-        ENTRY_SKILL.parent.mkdir(parents=True, exist_ok=True)
-        ENTRY_SKILL.write_text(entry, encoding="utf-8")
-    entry_name = [str(ENTRY_SKILL.relative_to(ROOT))] if entry_changed else []
+    want, n_memos = dist_outputs()
+    added, changed, removed = sync_dist(want, args.check)
+    names = added + changed + [f"{n}（削除）" for n in removed]
+    summary = f"（{n_memos} 件）"
     if args.check:
-        if outdated or stale or md_changed or entry_changed:
-            names = [f"docs/{n}" for n in outdated + md_changed + stale] + entry_name or ["docs/memos.json"]
-            print(", ".join(names) + " が古いです（python3 scripts/memo.py build を実行）")
+        if names:
+            shown = ", ".join(names[:10]) + (f" ほか {len(names) - 10} ファイル" if len(names) > 10 else "")
+            print(f"dist/ が古いです: {shown}（python3 scripts/memo.py build を実行）")
             return 1
-        print("一覧データは最新です")
+        print(f"dist/ は最新です{summary}")
         return 0
-    if md_changed:
-        print(f"Markdown 版を更新: {len(md_changed)} ファイル（docs/md/, docs/llms.txt）")
-    if entry_changed:
-        print(f"入口スキルを更新: {entry_name[0]}")
-    if outdated:
-        print(f"{', '.join(outdated)} を更新（{len(memos)} 件）")
-    elif not md_changed and not entry_changed:
-        print(f"変更なし（{len(memos)} 件）")
+    if names:
+        parts = [f"{label} {len(x)}" for label, x in (("追加", added), ("変更", changed), ("削除", removed)) if x]
+        print(f"dist/ を更新: {'・'.join(parts)} ファイル{summary}")
+    else:
+        print(f"変更なし{summary}")
     return 0
 
 
@@ -218,7 +188,7 @@ def cmd_preview(args) -> int:
     if p.is_file():
         src = p.resolve()
     elif p.name.removesuffix(".html") + ".html" in SPECIAL_NAMES:
-        src = DOCS / (p.name.removesuffix(".html") + ".html")
+        src = SRC / (p.name.removesuffix(".html") + ".html")
     else:
         src = memo_path(args.src)
     out = Path(args.out) if args.out else Path(tempfile.gettempdir()) / "memo-preview" / src.name
@@ -240,7 +210,7 @@ def main() -> int:
     p.add_argument("name")
     p.set_defaults(func=cmd_new)
 
-    p = sub.add_parser("add", help="外部の HTML を docs/ に取り込む")
+    p = sub.add_parser("add", help="外部の HTML を src/ に取り込む")
     p.add_argument("src")
     p.add_argument("name")
     p.add_argument("--force", action="store_true")
@@ -248,10 +218,10 @@ def main() -> int:
 
     p = sub.add_parser("path", help="メモの絶対パスを表示")
     p.add_argument("name")
-    p.add_argument("--md", action="store_true", help="Markdown 版（docs/md/NAME.md）のパス")
+    p.add_argument("--md", action="store_true", help="Markdown 版（dist/md/NAME.md。build で作られる）のパス")
     p.set_defaults(func=cmd_path)
 
-    p = sub.add_parser("url", help="公開 URL を表示（docs/CNAME から決まる）")
+    p = sub.add_parser("url", help="公開 URL を表示（src/CNAME から決まる）")
     p.add_argument("name", nargs="?")
     p.set_defaults(func=cmd_url)
 
@@ -269,8 +239,8 @@ def main() -> int:
     p.add_argument("--date", nargs="?", const="", help="YYYY-MM-DD（値なしで今日。タイムゾーンは memo.config.json）")
     p.set_defaults(func=cmd_meta)
 
-    p = sub.add_parser("build", help="一覧データ（memos.json）・Markdown 版・入口スキルを再生成")
-    p.add_argument("--check", action="store_true")
+    p = sub.add_parser("build", help="src/ から公開用のサイト一式（ページ・一覧データ・Markdown 版・入口スキル）を dist/ に書き出す")
+    p.add_argument("--check", action="store_true", help="書き出さずに、dist/ が最新かだけを見る")
     p.set_defaults(func=cmd_build)
 
     p = sub.add_parser("config", help="memo.config.json の設定を表示（KEY を付けるとその値だけ）")
@@ -281,7 +251,7 @@ def main() -> int:
     p.set_defaults(func=cmd_list)
 
     p = sub.add_parser("preview", help="一覧データを埋め込んだ 1 枚の HTML を書き出す（会話内プレビュー用）")
-    p.add_argument("src", help="メモ名・index、または下書きの HTML ファイル")
+    p.add_argument("src", help="メモ名・index・roadmap、または下書きの HTML ファイル")
     p.add_argument("-o", "--out", help="出力先（省略時は一時フォルダの memo-preview/）")
     p.set_defaults(func=cmd_preview)
 

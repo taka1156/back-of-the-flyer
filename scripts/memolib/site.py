@@ -5,10 +5,10 @@ import json
 import re
 
 from .blocks import apply_generated
-from .config import DOCS, SPECIAL_NAMES
+from .config import DIST, SPECIAL_NAMES
 from .meta import memo_files, read_meta
 
-MEMOS_JSON = DOCS / "memos.json"  # 一覧（トップページが読む）
+MEMOS_JSON = DIST / "memos.json"  # 一覧（トップページとロードマップが読む。build が dist/ に書く）
 
 
 def memos_json(memos: list[dict]) -> str:

@@ -1,6 +1,6 @@
 ---
 name: memo-reference
-description: MEMO の既存メモを参照・検索・部分修正するときに使う。「前に〜のメモ書いたよね」「MEMO に〜ってある？」「〜のメモを踏まえて説明して」「〜のメモのこの部分を直して」など。HTML ではなく Markdown 版（docs/md/）を読み、直すときは HTML の該当箇所だけを読んで編集する。
+description: MEMO の既存メモを参照・検索・部分修正するときに使う。「前に〜のメモ書いたよね」「MEMO に〜ってある？」「〜のメモを踏まえて説明して」「〜のメモのこの部分を直して」など。HTML ではなく Markdown 版（dist/md/。build で作る）を読み、直すときは HTML の該当箇所だけを読んで編集する。
 ---
 
 # memo-reference
@@ -10,12 +10,12 @@ description: MEMO の既存メモを参照・検索・部分修正するとき�
 
 ## 前提: Markdown 版とは
 
-`python3 scripts/memo.py build` が HTML から自動生成する（手で編集しない。次の build で上書きされる）。
+`python3 scripts/memo.py build` が HTML から `dist/` に自動生成する（手で編集しない。次の build で上書きされる）。`dist/` はコミットされないので、**clone した直後は無い。最初に必ず build する**（数秒）。
 
 | ファイル | 中身 |
 | --- | --- |
-| `docs/llms.txt` | 全メモの目次。タイトル・説明・タグ・日付と、各 Markdown 版へのリンク |
-| `docs/md/NAME.md` | 1 本のメモ。冒頭にタイトル・説明・元ページの URL・タグ・日付、続けて本文 |
+| `dist/llms.txt` | 全メモの目次。タイトル・説明・タグ・日付と、各 Markdown 版へのリンク |
+| `dist/md/NAME.md` | 1 本のメモ。冒頭にタイトル・説明・元ページの URL・タグ・日付、続けて本文 |
 
 本文の読み方:
 
@@ -28,10 +28,11 @@ description: MEMO の既存メモを参照・検索・部分修正するとき�
 
 ```bash
 cd "$(git rev-parse --show-toplevel)"
+python3 scripts/memo.py build       # dist/ に Markdown 版を作る（src/ は書き換えない）
 ```
 
-- まず `docs/llms.txt` を読む（全体で十数 KB）。タイトル・説明・タグで当たりをつける。
-- 言葉で探すなら `docs/md/` を Grep する（`-n` で行番号つき）。言い回しが違いそうなら、同義語・英語表記でも探す。
+- まず `dist/llms.txt` を読む（全体で十数 KB）。タイトル・説明・タグで当たりをつける。
+- 言葉で探すなら `dist/md/` を Grep する（`-n` で行番号つき）。言い回しが違いそうなら、同義語・英語表記でも探す。
 - 見つからなければ「MEMO にはない」と伝える。似たメモがあればそれを挙げる。
 
 ## 2. 読む
@@ -62,7 +63,7 @@ HTML を読むのは次のときだけ:
 
 ```bash
 python3 scripts/memo.py lint NAME      # OK になること
-python3 scripts/memo.py build          # 一覧と Markdown 版を更新
+python3 scripts/memo.py build          # dist/ を作り直す（Markdown 版を読み直すため。コミットはしない）
 BRANCH="$(python3 scripts/memo.py config branch)"   # push 先（memo.config.json）
 git fetch origin "$BRANCH"              # 遅れていれば rebase
 git add -A "$(dirname "$(python3 scripts/memo.py path NAME)")"
