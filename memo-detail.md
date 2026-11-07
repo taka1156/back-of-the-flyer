@@ -4,7 +4,7 @@
 入口は `scripts/memo.py`、処理の本体は `scripts/memolib/` にあり、テストは `tests/` にあります。
 標準ライブラリだけで動き、どのディレクトリから実行してもかまいません。
 
-使い方の入口は [README](README.md)、ページのデザイン規約とクイズの書き方は [memo-style](.claude/skills/memo-style/SKILL.md)、登録の手順は [memo-publish](.claude/skills/memo-publish/SKILL.md) にあります。このファイルは「スクリプトが何をどこに書くか」の説明です。
+どの依頼でどのスキルを使うかは [ROUTING.md](.claude/skills/ROUTING.md)、ページのデザイン規約（クイズを使うサイトではクイズの書き方も）は [memo-style](.claude/skills/memo-style/SKILL.md)、登録の手順は [memo-publish](.claude/skills/memo-publish/SKILL.md) にあります。このファイルは「スクリプトが何をどこに書くか」の説明です。
 
 ## 目次
 
@@ -18,6 +18,9 @@
 - [確認クイズのデータの流れ](#確認クイズのデータの流れ)
 - [AI 向けの Markdown 版](#ai-向けの-markdown-版)
 - [サイトごとの設定（memo.config.json）](#サイトごとの設定memoconfigjson)
+  - [トップ・クイズ・設定のページへの差し込み](#トップクイズ設定のページへの差し込み)
+  - [設定ページからアクセント色を変える](#設定ページからアクセント色を変える)
+  - [アプリ側の入口スキル](#アプリ側の入口スキル)
   - [ロードマップ（オプション）](#ロードマップオプション)
 - [日付と URL の決まり方](#日付と-url-の決まり方)
 - [表示の確認とプレビュー](#表示の確認とプレビュー)
@@ -122,7 +125,7 @@ flowchart LR
 - タグはカンマ区切り。表記ゆれを防ぐため、既存のタグ（`memo.py list` で見られる）を使い回します。
 - 日付の決まり方は[日付と URL の決まり方](#日付と-url-の決まり方)を参照。
 
-問題データの書式と作問ルールは [memo-style の「確認クイズ」](.claude/skills/memo-style/SKILL.md) にあります。
+問題データの書式と作問ルールは [memo-style](.claude/skills/memo-style/SKILL.md) の「確認クイズ」にあります（クイズを使うサイトのみ。`quiz` が `false` のサイトでは memo-style からその節を省いてかまいません）。
 
 ```html
 <script type="application/json" id="memo-quiz">
@@ -354,7 +357,7 @@ flowchart LR
 - `branding` を変えても `build` だけでは画像は変わりません。`python3 branding/render.py` で作り直します（設定ページから `Set accent color` で固定したときは、Actions が作り直します）（[日付と URL の決まり方](#日付と-url-の決まり方) の「URL」）。
 - `python3 scripts/memo.py config` で今の設定（と公開 URL）を表示できます。
 
-**トップ・クイズ・設定のページへの差し込み**
+### トップ・クイズ・設定のページへの差し込み
 
 `src/index.html`・`src/quiz.html`・`src/settings.html`・`src/roadmap.html` のサイト名などは手で書かず、目印の属性を付けておくと `build` が設定の値で書き換えて `dist/` に書き出します（原本の値はそのまま。表示されるのは `dist/` 側の値）。書式の中では `{site_name}`・`{description}`・`{repository}`・`{branch}`・`{accent}`（ダーク用のアクセント色）・`{accent_light}`（ライト用。自動のときは計算した色）が使えます。
 
@@ -366,7 +369,7 @@ flowchart LR
 
 目印の属性は残るので、何度 `build` しても同じ結果になります。中身がテキストだけの要素に使います（子要素があると中身ごと置き換わります）。
 
-**設定ページからアクセント色を変える**
+### 設定ページからアクセント色を変える
 
 GitHub Pages は表示するだけなので、ページから設定ファイルを書き換えることはできません。そこで、色を試すのは公開ページ（`settings.html`）、固定するのは GitHub Actions（`.github/workflows/set-accent.yml`、名前は `Set accent color`）に分けています。
 
@@ -386,7 +389,7 @@ flowchart LR
 - 「アイコン・OGP 画像も同じ色で作り直す」（`images`。既定でオン）のときは、Actions に playwright・chromium・Pillow・フォントを入れて `branding/render.py` も動かします。そのぶん 3〜5 分かかります。画像はそのままでよければチェックを外します（1〜2 分）。
 - 手元や Claude からは、`python3 scripts/memo.py accent '#3ddc97' '#0f7a50'` → `memo.config.json` をコミット・push すれば、Deploy MEMO が同じように公開します（手元の `build` は確認用）。
 
-**アプリ側の入口スキル**
+### アプリ側の入口スキル
 
 claude.ai のアプリに置く入口スキルは「このリポジトリを取ってきて、ここのスキルに従う」だけのものです。リポジトリ名とブランチだけはアプリ側で知っている必要があるので、`build` が設定から `dist/entry-skill/SKILL.md` を作ります（dist ブランチと公開サイトの `/entry-skill/SKILL.md` にも置かれます）。設定を変えたら、これをアプリ側のスキルに貼り直します。
 
@@ -397,7 +400,7 @@ claude.ai のアプリに置く入口スキルは「このリポジトリを取�
 `src/roadmap.html` は、書いたメモとこれから書くテーマを分野ごとに並べたチェックリストです。必ず要るものではないので、既定ではオフです。`memo.config.json` に `"roadmap": true` を書いて `build` すると公開され、各ページ上部のナビとトップページのフッターに「ロードマップ」のリンクが出ます。
 
 - 項目はページのスクリプト冒頭の `ROADMAP` に書きます。書いたメモは `file` だけ、これから書くテーマは `title`・`prio`（`high` / `mid` / `low`）・`note` も書きます。別の名前でも済みにしたいときは `alt` にファイル名を並べます。
-- 項目を相談して決める・その順にメモを書く・書いたメモを項目に足す、は [memo-roadmap](.claude/skills/memo-roadmap/SKILL.md) の手順で行います（「次のメモを書いて」など）。
+- 項目を相談して決める・その順にメモを書く・書いたメモを項目に足す、は memo-roadmap スキル（`.claude/skills/memo-roadmap/`）の手順で行います（「次のメモを書いて」など）。このスキルが無いリポジトリでロードマップを使うときは、memo-kit から持ってきて `.claude/skills/ROUTING.md` の表にも足します。
 - チェックは手で付けません。ページが `memos.json` を読み、項目の `file` か `alt` があれば済みにします。どの項目にも当てはまらないメモは「ロードマップ外のメモ」に並びます。
 - オフのときは、`build` が `dist/` に `roadmap.html` を出さず、ほかのページの `data-memo-if="roadmap"` の付いた要素（トップページのリンク）を取り除きます。オンなら何もしません。
 
@@ -426,7 +429,7 @@ flowchart LR
 - 公開 URL は `src/CNAME` の独自ドメインから決まります（無ければ `memo.config.json` の `repository` から GitHub Pages の URL `https://OWNER.github.io/REPO/` を作ります）。`og:url`・`og:image` の絶対 URL にも使います。
 - `og:image` には `og.png` の中身から作った短いハッシュ（`?v=…`）を付けます。画像を差し替えると URL が変わり、SNS 側の画像キャッシュが古いまま残るのを防げます。
 - アイコンと OGP 画像の生成元は `branding/`（`og.html`・`icon.html`・`leaf.css`）で、`python3 branding/render.py` で `src/assets/` に書き出します（`branding/` は公開されません）。文字と色は `memo.config.json`（`site_name`・`description`・公開 URL と `branding`）から差し込むので、HTML を直接書き換える必要はありません。
-- `render.py` だけは標準ライブラリでは動きません（playwright と chromium、Pillow、フォント Noto Sans CJK JP / DejaVu Sans Mono が必要。README の「必要なもの」）。Actions では `Set accent color` だけが動かします。それ以外の設定（サイト名・`branding` の文字など）を変えたら手元で実行し、できた画像をコミットします。`og.png` が変わると、次の `build`（デプロイ）で `og:image` の `?v=` が更新されます。
+- `render.py` だけは標準ライブラリでは動きません（`pip install playwright pillow` と `python3 -m playwright install chromium`、フォント Noto Sans CJK JP / DejaVu Sans Mono が必要。Ubuntu なら `apt install fonts-noto-cjk fonts-dejavu-core`）。Actions では `Set accent color` だけが動かします。それ以外の設定（サイト名・`branding` の文字など）を変えたら手元で実行し、できた画像をコミットします。`og.png` が変わると、次の `build`（デプロイ）で `og:image` の `?v=` が更新されます。
 
 ## 表示の確認とプレビュー
 
@@ -466,7 +469,7 @@ flowchart LR
 | 原本のブランチ | 何もコミットしない（以前の `Rebuild MEMO index` のような Actions のコミットは入らない） |
 | 同時実行 | 同じブランチの実行は 1 本ずつ順番に動く（`concurrency`。途中で止めない）。dist ブランチに書くのはこのワークフローだけなので、push の競合は起きない |
 
-もう 1 つの `.github/workflows/test.yml`（`Test memo.py`）は、`scripts/`・`tests/`・クイズの共通ファイル・トップ・クイズ・設定のページ・`memo.config.json`・テンプレートが変わったとき（どのブランチでも、PR も含む）にテストを流します。リポジトリは書き換えません。
+もう 1 つの `.github/workflows/test.yml`（`Test memo.py`）は、`scripts/`・`tests/`・クイズの共通ファイル・トップ・クイズ・設定・ロードマップのページ・`memo.config.json`・テンプレートが変わったとき（どのブランチでも、PR も含む）にテストを流します。リポジトリは書き換えません。
 
 ## コードの構成とテスト
 
@@ -563,7 +566,7 @@ python3 -B tests/snapshot.py OUTDIR            # 全コマンドの出力を保�
 
 ## このキットから始める
 
-メモ（中身）と仕組みは分けてあり、仕組みは本物のメモがなくても動きます。テンプレートから作ったリポジトリでは、サンプルのメモと生成物を消して設定を書き換えれば自分のサイトになります（README の「はじめかた」と同じ手順の詳細です）。
+メモ（中身）と仕組みは分けてあり、仕組みは本物のメモがなくても動きます。テンプレートから作ったリポジトリでは、サンプルのメモと生成物を消して設定を書き換えれば自分のサイトになります。
 
 **仕組み（残すもの）**
 
@@ -574,7 +577,7 @@ python3 -B tests/snapshot.py OUTDIR            # 全コマンドの出力を保�
 | `.github/workflows/` | デプロイ・テスト・アクセント色の固定のワークフロー |
 | `src/index.html`・`src/quiz.html`・`src/settings.html`・`src/roadmap.html`・`src/assets/` | トップ・クイズ・設定・ロードマップのページ、クイズの共通ファイル、アイコン（ロードマップはオプション。使うなら `ROADMAP` の例を自分のテーマに書き換える） |
 | `branding/` | アイコンと OGP 画像の生成元 |
-| `memo.config.json`・`README.md`・`memo-detail.md`・`LICENSE`・`.gitignore` | 設定・説明・ライセンス |
+| `memo.config.json`・`README.md`・`CLAUDE.md`・`memo-detail.md`・`LICENSE`・`.gitignore` | 設定・説明（`CLAUDE.md` はリポジトリで作業する Claude への案内）・ライセンス |
 
 **サンプルの中身（消すもの）**
 
@@ -596,4 +599,11 @@ python3 scripts/memo.py build              # repository を書き換え忘れて
 python3 -B -m unittest discover -s tests   # 本物のメモを見るテストは飛ばされる
 ```
 
-あとは GitHub の設定（Actions の書き込み権限、最初のデプロイで dist ブランチができたら Pages の公開元を dist ブランチの `/`（root）に）を README の「はじめかた」のとおりにし、`dist/entry-skill/SKILL.md` をアプリ側のスキルとして登録すれば、アプリからも使えます。
+あとは GitHub の設定です。
+
+1. Settings → Actions → General → Workflow permissions を「Read and write permissions」にする（`Deploy MEMO` が dist ブランチに push するため）。
+2. push する（または Actions の画面から `Deploy MEMO` を「Run workflow」で実行する）と、dist ブランチができる。
+3. Settings → Pages → Source を「Deploy from a branch」、ブランチを `dist`、フォルダを `/ (root)` にする。
+4. 独自ドメインを使うなら `src/CNAME` にドメインを 1 行書いて push し、DNS を設定する。
+
+`dist/entry-skill/SKILL.md` をアプリ側のスキルとして登録すれば、アプリからも使えます。
