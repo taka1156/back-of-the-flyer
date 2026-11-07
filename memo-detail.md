@@ -570,7 +570,7 @@ python3 -B tests/snapshot.py OUTDIR            # 全コマンドの出力を保�
 | 場所 | 中身 |
 | --- | --- |
 | `scripts/`・`tests/`（`tests/fixtures/` を含む） | `memo.py` とテスト |
-| `.claude/skills/` | スキルとメモの雛形 |
+| `.claude/skills/` | スキル、メモの雛形、スキルの振り分けの表（`ROUTING.md`） |
 | `.github/workflows/` | デプロイ・テスト・アクセント色の固定のワークフロー |
 | `src/index.html`・`src/quiz.html`・`src/settings.html`・`src/roadmap.html`・`src/assets/` | トップ・クイズ・設定・ロードマップのページ、クイズの共通ファイル、アイコン（ロードマップはオプション。使うなら `ROADMAP` の例を自分のテーマに書き換える） |
 | `branding/` | アイコンと OGP 画像の生成元 |
