@@ -2,7 +2,7 @@
   "site_name": "CheatSheet",
   "description": "特定のツールやライブラリの使い方を、わかりやすくまとめたチートシート置き場",
   "llms_description": "特定のツール・ライブラリ・フレームワークに依存する使い方（コマンド・設定・API・ハマりどころ）を、図解つき HTML でまとめたチートシートの集まり。各リンク先は本文を Markdown にしたもので、元のページへの URL も含む。",
-  "repository": "taka1156/back-of-the-flyer",
+  "repository": "taka1156/cheatsheet",
   "branch": "master",
   "deploy_branch": "dist",
   "utc_offset_hours": 9,
