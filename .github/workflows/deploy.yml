@@ -13,6 +13,7 @@ on:
       - "memo.config.json" # サイト名・リポジトリ・ブランチ・アクセント色・ロードマップ
       - ".github/workflows/deploy.yml"
   workflow_dispatch:
+  workflow_call: # Set accent color が設定を変えたあとに呼ぶ（Actions からの push では push のワークフローが動かないため）
 
 permissions:
   contents: write
@@ -29,7 +30,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # push なら push されたコミット、手動実行ならデフォルトブランチの最新
+          # push なら push されたコミット、それ以外（手動・Set accent color から）はデフォルトブランチの最新
           ref: ${{ github.event_name == 'push' && github.sha || github.event.repository.default_branch }}
           fetch-depth: 0 # memo:date がないメモの日付を git 履歴から推定するため
 
@@ -39,7 +40,7 @@ jobs:
 
       - name: Lint memos (report only)
         run: |
-          memos=$(ls src/*.html | grep -v -e '/index.html$' -e '/roadmap.html$' || true)
+          memos=$(ls src/*.html | grep -v -e '/index.html$' -e '/settings.html$' -e '/roadmap.html$' || true)
           if [ -z "$memos" ]; then
             echo "メモがまだないので lint は省略"
           else

@@ -100,10 +100,35 @@ class ConfigTest(unittest.TestCase):
             self.assertTrue(hasattr(config, name.strip()), name)
         self.assertEqual(config.ASSETS, config.SRC / "assets")
 
+    def test_set_accent_rewrites_only_accent(self):
+        import tempfile
+        from pathlib import Path
+        with tempfile.TemporaryDirectory() as d:
+            f = Path(d) / "memo.config.json"
+            original = {"site_name": "X", "branding": {"tagline": "t", "accent": "#00d4ff", "accent_light": "#0077b6"},
+                        "branch": "main"}
+            f.write_text(json.dumps(original, ensure_ascii=False), encoding="utf-8")
+            cfg = config.set_accent("#3ddc97", "#0f7a50", f)
+            self.assertEqual(config.accents(cfg), ("#0f7a50", "#3ddc97"))
+            saved = json.loads(f.read_text(encoding="utf-8"))
+            # ほかの項目と並び順はそのまま
+            self.assertEqual(list(saved), ["site_name", "branding", "branch"])
+            self.assertEqual(saved["branding"], {"tagline": "t", "accent": "#3ddc97", "accent_light": "#0f7a50"})
+            # ライト用を空にすると項目を消し、accent から自動で決まる
+            cfg = config.set_accent("#3ddc97", "", f)
+            self.assertNotIn("accent_light", json.loads(f.read_text(encoding="utf-8"))["branding"])
+            self.assertEqual(config.accents(cfg), (config.light_accent("#3ddc97"), "#3ddc97"))
+            # 正しくない色なら止まり、ファイルは書き換える前のまま
+            before = f.read_text(encoding="utf-8")
+            for bad in (("green", ""), ("#3ddc97", "#12345")):
+                with self.assertRaises(SystemExit):
+                    config.set_accent(*bad, f)
+                self.assertEqual(f.read_text(encoding="utf-8"), before)
+
     def test_optional_pages_follow_config(self):
         self.assertFalse(config.page_enabled("roadmap.html", {**config.DEFAULTS}))
         self.assertTrue(config.page_enabled("roadmap.html", {**config.DEFAULTS, "roadmap": True}))
-        self.assertTrue(config.page_enabled("index.html", {**config.DEFAULTS}))  # オプションでないページは常に出す
+        self.assertTrue(config.page_enabled("settings.html", {**config.DEFAULTS}))  # オプションでないページは常に出す
         self.assertTrue(set(config.OPTIONAL_PAGES) <= config.SPECIAL_NAMES)
         self.assertTrue(set(config.OPTIONAL_PAGES.values()) <= set(config.DEFAULTS))
 
