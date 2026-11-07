@@ -4,5 +4,4 @@
 
 ## Memos
 
-- [サンプルのメモ](https://repo.github.io/sample/md/sample.md): テスト用のサンプル。図と別メモへのリンクを含む（サンプル, テスト / 2026-01-10）
-- [最小のメモ](https://repo.github.io/sample/md/sample-plain.md): テスト用のサンプル。本文だけの最小のページ（テスト / 2026-01-05）
+- [Vite+ と vp コマンド チートシート](https://repo.github.io/sample/md/vite-plus.md): Vite・Vitest・Oxlint などを 1 つにまとめた Vite+ の機能と、vp コマンドの使い方を用途別に一覧にしたチートシート。（Vite, JavaScript, ツール / 2026-11-07）
