@@ -4,7 +4,7 @@ from __future__ import annotations
 import re
 from html.parser import HTMLParser
 
-from .blocks import BACKLINK_ID, strip_quiz
+from .blocks import BACKLINK_ID, QUIZ_RE
 from .config import CONFIG, DIST, SRC, HEAD_RE, SITE_NAME, SITE_URL, SPECIAL_NAMES, read_text
 
 #
@@ -17,7 +17,7 @@ LLMS_TXT = DIST / "llms.txt"
 MD_NOTE = "<!-- scripts/memo.py build が自動生成。手で編集しない -->"
 
 _MD_SKIP_TAGS = {"head", "style", "script", "noscript", "template"}
-_MD_SKIP_IDS = {BACKLINK_ID}
+_MD_SKIP_IDS = {"memo-quiz-ui", BACKLINK_ID}
 _MD_VOID = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta",
             "source", "track", "wbr"}
 _MD_BLOCKS = {"p", "div", "section", "article", "main", "header", "footer", "nav", "aside",
@@ -271,13 +271,13 @@ def _md_link(href: str) -> str:
 
 
 def html_to_markdown(text: str, page_url: str = "") -> str:
-    """メモの HTML から本文を Markdown として取り出す（<head>・CSS・JS は除く）。
+    """メモの HTML から本文を Markdown として取り出す（<head>・CSS・JS・クイズ UI は除く）。
 
     本文の大半を JavaScript のデータから描画するページは、HTML だけでは中身が取れない。
     page_url を渡すと、図や操作できるパーツのある節に、元ページのその節へのリンクを付ける。
     取れた本文がごく短く、ページ内に大きなスクリプトがあるときは、そのスクリプトを
     （データ配列ごと）コードブロックとして末尾に付ける。"""
-    text = strip_quiz(HEAD_RE.sub("", text))
+    text = QUIZ_RE.sub("", HEAD_RE.sub("", text))
     p = _ToMarkdown(page_url)
     p.feed(text)
     body = p.result()

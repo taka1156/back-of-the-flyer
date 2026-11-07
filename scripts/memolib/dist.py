@@ -3,9 +3,8 @@
 原本（src/）は読むだけで書き換えない。dist/ は公開するサイト一式で、
 src/ のファイルのコピーに、次の生成物を加えたものになる。
 
-- 各ページ（メモ・トップ・ロードマップ）: 自動生成ブロック（memo:head）とサイト設定を差し込んだもの
-  （ロードマップなどオプションのページは memo.config.json でオンのときだけ）
-- memos.json（一覧）
+- 各ページ（メモ・トップ・クイズ・設定）: 自動生成ブロック（memo:head・memo:quiz）とサイト設定を差し込んだもの
+- memos.json・quizzes.json（一覧と全問題。quizzes.json は memo.config.json の quiz が true のときだけ）
 - md/NAME.md・llms.txt（AI 向けの Markdown 版）
 - entry-skill/SKILL.md（アプリ側に置く入口スキル）
 
@@ -16,15 +15,15 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .blocks import apply_generated
-from .config import DIST, SRC, ENTRY_SKILL, SPECIAL_NAMES, page_enabled, read_text
+from .blocks import QUIZ_CSS, QUIZ_JS, apply_generated
+from .config import CONFIG, DIST, SRC, ENTRY_SKILL, SPECIAL_NAMES, page_enabled, read_text
 from .entry import entry_skill
 from .markdown import LLMS_TXT, MD_DIR, markdown_outputs
 from .meta import memo_files
-from .site import MEMOS_JSON, memos_json, site_data
+from .site import MEMOS_JSON, QUIZZES_JSON, memos_json, quizzes_json, site_data
 
 # src/ にあってもコピーしないもの（どれも build が作る。昔のリポジトリの生成物が残っていても公開しない）
-_GENERATED_NAMES = {MEMOS_JSON.name, "quizzes.json", LLMS_TXT.name}
+_GENERATED_NAMES = {MEMOS_JSON.name, QUIZZES_JSON.name, LLMS_TXT.name}
 _GENERATED_DIRS = {MD_DIR.name}
 
 
@@ -39,12 +38,14 @@ def _copied_files() -> list[Path]:
             continue  # ページは自動生成ブロックを入れて書き出す
         if rel.parts[0] in _GENERATED_DIRS:
             continue
+        if not CONFIG["quiz"] and p in (QUIZ_CSS, QUIZ_JS):
+            continue  # クイズがオフなら表示の CSS / JS も出さない
         out.append(p)
     return out
 
 
-def dist_outputs() -> tuple[dict[Path, bytes], int]:
-    """dist/ に置くべき全ファイル（{dist/ 内のパス: 中身}）と、メモの件数。"""
+def dist_outputs() -> tuple[dict[Path, bytes], int, int]:
+    """dist/ に置くべき全ファイル（{dist/ 内のパス: 中身}）と、メモの件数・問題の数。"""
     want: dict[Path, bytes] = {}
     for p in _copied_files():
         want[DIST / p.relative_to(SRC)] = p.read_bytes()
@@ -52,12 +53,14 @@ def dist_outputs() -> tuple[dict[Path, bytes], int]:
     pages = memo_files() + sorted(SRC / n for n in SPECIAL_NAMES if (SRC / n).is_file() and page_enabled(n))
     for p in pages:
         want[DIST / p.name] = apply_generated(read_text(p), p.name).encode("utf-8")
-    memos = site_data()
-    want[MEMOS_JSON] = memos_json(memos).encode("utf-8")
+    memos, quizzes = site_data()
+    want[MEMOS_JSON] = memos_json(memos, quizzes).encode("utf-8")
+    if CONFIG["quiz"]:  # クイズがオフなら全問題のファイルも作らない
+        want[QUIZZES_JSON] = quizzes_json(quizzes).encode("utf-8")
     for path, text in markdown_outputs(memos).items():
         want[path] = text.encode("utf-8")
     want[ENTRY_SKILL] = entry_skill().encode("utf-8")
-    return want, len(memos)
+    return want, len(memos), len(quizzes)
 
 
 def _existing() -> dict[Path, bytes]:

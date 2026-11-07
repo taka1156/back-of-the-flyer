@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import re
 
-from .blocks import BACKLINK, BACKLINK_ID, strip_generated
+from .blocks import BACKLINK, BACKLINK_ID, read_quiz, strip_generated
 
 CURLY = "‘’“”"
 
@@ -87,10 +87,13 @@ def lint_text(text: str, backlink: bool) -> tuple[str, list[str], list[str]]:
         problems.append("一覧（index.html）へのリンクがない（--backlink で追加）")
 
     # 自動生成ブロックは build が dist/ のページにだけ入れる。原本に入っていたら（古い形のページや
-    # 公開ページからコピーした HTML）取り除く。廃止したクイズの表示ブロックと問題データも取り除く
+    # 公開ページからコピーした HTML）取り除く
     new = strip_generated(text)
     if new != text:
-        fixed.append("自動生成ブロック（memo:head）と旧クイズを原本から削除（build が dist/ に head を入れる）")
+        fixed.append("自動生成ブロック（memo:head・memo:quiz）を原本から削除（build が dist/ に入れる）")
         text = new
+
+    _qs, quiz_problems = read_quiz(text)
+    problems.extend(f"クイズ: {p}" for p in quiz_problems)
 
     return text, fixed, problems

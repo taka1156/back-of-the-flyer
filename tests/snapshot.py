@@ -8,7 +8,7 @@
 付けたときは、tests/fixtures/ のサンプルのメモで実行する。
 
 - dist/ を消してから build（dist/ 全体を build/ に保存）
-- 全メモの lint と preview、index / settings / roadmap の preview
+- 全メモの lint と preview、index / quiz の preview
 - 壊れた下書きの lint --fix と preview、new / add / meta / path / url / list
 
 変更の前と後で 1 回ずつ実行し、`diff -r 前 後` で何も出なければ出力は変わっていない。
@@ -56,7 +56,7 @@ def main(out: Path, fixtures: bool) -> None:
         for n in names:
             run("lint", n)
             run("preview", n, "-o", str(out / "preview" / f"{n}.html"))
-        for n in ("index", "settings", "roadmap"):
+        for n in ("index", "quiz"):
             run("preview", n, "-o", str(out / "preview" / f"{n}.html"))
 
         draft = ws.root / "draft.html"

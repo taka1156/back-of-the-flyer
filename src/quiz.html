@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title data-memo-site="{site_name} クイズ">CheatSheet クイズ</title>
+<meta name="description" content="CheatSheet の確認クイズから、ランダムやカテゴリ別に 10 問ずつ、またはタイムアタックで解けるページ" data-memo-site-content="{site_name} の確認クイズから、ランダムやカテゴリ別に 10 問ずつ、またはタイムアタックで解けるページ">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Noto+Sans+JP:wght@400;500;700&display=swap">
+<style>
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --fg: #1c2230;
+  --fg-2: #5a6376;
+  --line: #dde1e8;
+  --accent: #0077b6;
+  --chip: #eceff4;
+  --ok: #1a7f37;
+  --ng: #cf222e;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0a0e14;
+    --surface: #111823;
+    --fg: #cdd9e5;
+    --fg-2: #7d8b9d;
+    --line: #1e2d3d;
+    --accent: #00d4ff;
+    --chip: #18222f;
+    --ok: #3fb950;
+    --ng: #f85149;
+  }
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: 'Noto Sans JP', system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.7;
+  min-height: 100vh;
+  padding: 48px 16px 64px;
+}
+.wrap { max-width: 720px; margin: 0 auto; }
+header { margin-bottom: 24px; }
+.back { font: 600 0.75rem 'JetBrains Mono', monospace; color: var(--fg-2); text-decoration: none; }
+.back:hover { color: var(--accent); }
+h1 {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 1.6rem;
+  letter-spacing: 0.12em;
+  color: var(--accent);
+  margin-top: 8px;
+}
+.lead { color: var(--fg-2); font-size: 0.85rem; margin-top: 4px; }
+[hidden] { display: none !important; }
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 14px;
+}
+.panel h2 { font-size: 1rem; margin-bottom: 4px; }
+.panel .note { color: var(--fg-2); font-size: 0.8rem; margin-bottom: 14px; }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  border: 1px solid var(--line);
+  background: var(--chip);
+  color: var(--fg);
+  border-radius: 999px;
+  padding: 8px 18px;
+  font: 700 0.85rem 'Noto Sans JP', system-ui, sans-serif;
+  cursor: pointer;
+  text-decoration: none;
+}
+.btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+.btn.primary:hover:not(:disabled) { color: var(--bg); filter: brightness(1.08); }
+.btn:disabled { opacity: .45; cursor: default; }
+
+.tags { display: flex; flex-wrap: wrap; gap: 8px; }
+.tag {
+  border: 1px solid var(--line);
+  background: var(--chip);
+  color: var(--fg);
+  border-radius: 999px;
+  padding: 6px 13px;
+  font: 600 0.78rem 'JetBrains Mono', monospace;
+  cursor: pointer;
+}
+.tag small { color: var(--fg-2); font-weight: 500; margin-left: 4px; }
+.tag:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.tag:disabled { opacity: .4; cursor: default; }
+.tag[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+.tag[aria-pressed="true"]:hover { color: var(--bg); filter: brightness(1.08); }
+.tag[aria-pressed="true"] small { color: var(--bg); opacity: .8; }
+.pick { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 14px; }
+.pick .count { color: var(--fg-2); font-size: 0.8rem; }
+.clear { background: none; border: 0; color: var(--fg-2); font: 600 0.75rem 'JetBrains Mono', monospace; cursor: pointer; }
+.clear:hover { color: var(--accent); }
+.sub { color: var(--fg-2); font-size: 0.78rem; font-weight: 700; margin: 14px 0 8px; }
+
+/* タイムアタックの制限時間 */
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; margin-bottom: 14px; }
+.seg button {
+  border: 0; background: var(--chip); color: var(--fg-2);
+  padding: 6px 16px; font: 700 0.8rem 'JetBrains Mono', monospace; cursor: pointer;
+}
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-checked="true"] { background: var(--accent); color: var(--bg); }
+.timer { font: 700 0.95rem 'JetBrains Mono', monospace; color: var(--accent); min-width: 5.5em; text-align: right; }
+.timer.warn { color: var(--ng); }
+.bar.time i { transition: none; }
+.bar.time.warn i { background: var(--ng); }
+.tally { font: 700 0.78rem 'JetBrains Mono', monospace; color: var(--fg-2); margin-left: auto; }
+.tally:not([hidden]) + .quit { margin-left: 12px; }
+.keys { font: 0.7rem 'JetBrains Mono', monospace; color: var(--fg-2); margin-top: 10px; }
+
+/* 出題中 */
+.progress { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; font: 700 0.8rem 'JetBrains Mono', monospace; color: var(--fg-2); }
+.bar { flex: 1; height: 6px; border-radius: 999px; background: var(--chip); overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--accent); transition: width .25s; }
+.from { font: 0.72rem 'JetBrains Mono', monospace; color: var(--fg-2); }
+.question { font-weight: 700; font-size: 1.02rem; margin: 4px 0 14px; line-height: 1.6; }
+.choices { display: flex; flex-direction: column; gap: 8px; }
+.choice {
+  text-align: left;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--chip);
+  color: var(--fg);
+  font: inherit; font-size: 0.92rem; line-height: 1.5;
+  cursor: pointer;
+}
+.choice:hover:not(:disabled) { border-color: var(--accent); }
+.choice:disabled { cursor: default; opacity: .6; }
+.choice.ok { opacity: 1; border-color: var(--ok); box-shadow: inset 3px 0 0 var(--ok); }
+.choice.ng { opacity: 1; border-color: var(--ng); box-shadow: inset 3px 0 0 var(--ng); }
+.feedback { margin-top: 12px; font-size: 0.86rem; color: var(--fg-2); line-height: 1.7; }
+b.ok { color: var(--ok); }
+b.ng { color: var(--ng); }
+.ref { color: var(--accent); font-weight: 700; text-decoration: none; white-space: nowrap; }
+.ref:hover { text-decoration: underline; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.quit { margin-left: auto; background: none; border: 0; color: var(--fg-2); font: 600 0.75rem 'JetBrains Mono', monospace; cursor: pointer; }
+.quit:hover { color: var(--accent); }
+
+/* 結果 */
+.score { text-align: center; padding: 8px 0 16px; }
+.score .num { font: 700 2.4rem/1.1 'JetBrains Mono', monospace; color: var(--accent); }
+.score .num small { font-size: 1rem; color: var(--fg-2); }
+.score .msg { color: var(--fg-2); font-size: 0.85rem; margin-top: 6px; }
+.review { list-style: none; display: flex; flex-direction: column; }
+.review li { padding: 12px 0; border-top: 1px solid var(--line); font-size: 0.86rem; }
+.review .rq { font-weight: 700; }
+.review .ra { color: var(--fg-2); }
+.review .rx { color: var(--fg-2); margin-top: 2px; }
+.review .rs { font: 0.7rem 'JetBrains Mono', monospace; color: var(--fg-2); margin-top: 2px; }
+.empty { color: var(--fg-2); font-size: 0.85rem; }
+footer { margin-top: 40px; font-size: 0.75rem; color: var(--fg-2); text-align: center; }
+footer a { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="back" href="index.html">&larr; 一覧に戻る</a>
+    <h1>QUIZ</h1>
+    <p class="lead">各メモの確認クイズから 10 問ずつ、またはタイムアタックで出題します</p>
+  </header>
+
+  <!-- 条件を選ぶ -->
+  <section id="setup">
+    <div class="panel">
+      <h2>🎲 ランダム 10 問</h2>
+      <p class="note" id="all-note"></p>
+      <button class="btn primary" id="start-random" type="button">はじめる</button>
+    </div>
+    <div class="panel">
+      <h2>🏷 カテゴリを選んで 10 問</h2>
+      <p class="note">複数選べます（どれかのカテゴリに入る問題から出題）。数字はそのカテゴリの問題数。10 問未満なら全問を出します</p>
+      <div class="tags" id="tag-list"></div>
+      <div class="pick">
+        <button class="btn primary" id="start-cat" type="button" disabled>選んだカテゴリではじめる</button>
+        <span class="count" id="cat-count"></span>
+        <button class="clear" id="clear-cat" type="button" hidden>選択を解除</button>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>⏱ タイムアタック</h2>
+      <p class="note">制限時間内に何問正解できるか挑戦します。答えるとすぐ次の問題へ進み、正解と解説は最後にまとめて表示します</p>
+      <div class="seg" id="ta-time" role="radiogroup" aria-label="制限時間">
+        <button type="button" role="radio" data-sec="30">30 秒</button>
+        <button type="button" role="radio" data-sec="60">1 分</button>
+        <button type="button" role="radio" data-sec="180">3 分</button>
+      </div>
+      <div><button class="btn primary" id="ta-random" type="button">🎲 ランダムではじめる</button></div>
+      <p class="sub">または、カテゴリを選んではじめる（複数選べます）</p>
+      <div class="tags" id="ta-tag-list"></div>
+      <div class="pick">
+        <button class="btn primary" id="start-ta-cat" type="button" disabled>選んだカテゴリではじめる</button>
+        <span class="count" id="ta-cat-count"></span>
+        <button class="clear" id="clear-ta-cat" type="button" hidden>選択を解除</button>
+      </div>
+    </div>
+    <p class="empty" id="no-quiz" hidden>まだクイズがありません。各メモにクイズを追加すると、ここで解けるようになります。</p>
+  </section>
+
+  <!-- 出題中 -->
+  <section id="play" hidden>
+    <div class="panel">
+      <div class="progress"><span id="count"></span><span class="bar" id="bar-box"><i id="bar"></i></span><span class="timer" id="timer" hidden></span><span id="cond"></span></div>
+      <p class="from"><span id="from"></span></p>
+      <p class="question" id="question"></p>
+      <div class="choices" id="choices"></div>
+      <p class="keys" id="keys" hidden>数字キー 1〜<span id="keys-n"></span> でも答えられます</p>
+      <p class="feedback" id="feedback" hidden></p>
+      <div class="actions">
+        <button class="btn primary" id="next" type="button" hidden>次の問題 →</button>
+        <span class="tally" id="tally" hidden></span>
+        <button class="quit" id="quit" type="button">やめる</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 結果 -->
+  <section id="result" hidden>
+    <div class="panel">
+      <div class="score">
+        <div class="num" id="score"></div>
+        <p class="msg" id="score-msg"></p>
+      </div>
+      <ol class="review" id="review"></ol>
+      <div class="actions">
+        <button class="btn primary" id="retry-wrong" type="button">間違えた問題だけもう一度</button>
+        <button class="btn" id="retry" type="button">同じ条件でもう一度</button>
+        <button class="btn" id="reset" type="button">条件を選び直す</button>
+      </div>
+    </div>
+  </section>
+
+  <footer><a href="index.html" data-memo-site="{site_name} 一覧">CheatSheet 一覧</a></footer>
+</div>
+
+<script>
+// 問題は各メモの確認クイズから集めた quizzes.json、タグは memos.json から読み込む（memo.py build が生成。memo-detail.md 参照）
+// memo.py preview で作ったプレビュー用のコピーでは、埋め込まれた window.MEMO_DATA を使う
+const MEMO_DATA = window.MEMO_DATA || null;
+async function loadJSON(name) {
+  if (MEMO_DATA && MEMO_DATA[name]) return MEMO_DATA[name];
+  const res = await fetch(name, { cache: 'no-cache' });
+  if (!res.ok) throw new Error(`${name}: HTTP ${res.status}`);
+  return res.json();
+}
+let MEMOS = [];
+let QUIZZES = [];
+let tagsOf = {};
+
+const COUNT = 10;
+const $ = id => document.getElementById(id);
+const shuffle = a => {
+  a = a.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+};
+const show = name => ['setup', 'play', 'result'].forEach(s => { $(s).hidden = s !== name; });
+
+let cond = null;   // { tags: [] (= ランダム) | ['JavaScript', 'Linux'], ta: 0 | 制限時間（秒） }
+let set = [];      // 出題する問題
+let picks = [];    // 選んだ選択肢の番号
+let pos = 0;
+
+// タイムアタック
+const TA_TIMES = [30, 60, 180];
+let taTime = 60;
+let deadline = 0;  // performance.now() 基準の終了時刻
+let timerId = null;
+let taEnd = null;  // { reason: 'time' | 'all', left: 残り秒 }
+
+// 選んでいるカテゴリ（10 問用とタイムアタック用で別々。条件を選び直すときは残す）
+const picked = { cat: new Set(), ta: new Set() };
+let tagCounts = {};
+
+// 本文の該当箇所へのリンク（別タブで開き、クイズの進み具合を残す）
+function refLink(q, label) {
+  const a = document.createElement('a');
+  a.className = 'ref';
+  a.href = q.file + (q.ref || '');
+  a.target = '_blank';
+  a.rel = 'noopener';
+  a.textContent = label;
+  return a;
+}
+// 選んだカテゴリのどれかに入る問題（カテゴリなしなら全問）
+const poolFor = tags => tags.length
+  ? QUIZZES.filter(q => (tagsOf[q.file] || []).some(t => tags.includes(t)))
+  : QUIZZES;
+const tagsLabel = tags => !tags.length ? 'ランダム'
+  : tags.length <= 2 ? tags.join('・') : `${tags.slice(0, 2).join('・')} ほか ${tags.length - 2}`;
+const condLabel = c => (c.ta ? `⏱ ${secLabel(c.ta)}・` : '') + tagsLabel(c.tags);
+const secLabel = sec => sec % 60 ? `${sec} 秒` : `${sec / 60} 分`;
+
+// 自己ベスト（タイムアタックの条件ごと。ブラウザに保存できないときは出さない）
+const bestKey = c => `memo-quiz-ta:${c.ta}:${c.tags.length ? c.tags.slice().sort().join(',') : '*'}`;
+function getBest(c) {
+  try { const v = localStorage.getItem(bestKey(c)); return v == null ? null : +v; } catch (e) { return null; }
+}
+function setBest(c, n) {
+  try { localStorage.setItem(bestKey(c), String(n)); } catch (e) { /* 保存できなくても続ける */ }
+}
+
+// ---- 条件選択
+// カテゴリのボタン。押すと選択・解除を切り替える
+function renderTags(kind) {
+  const ids = { cat: ['tag-list', 'start-cat', 'cat-count', 'clear-cat'], ta: ['ta-tag-list', 'start-ta-cat', 'ta-cat-count', 'clear-ta-cat'] }[kind];
+  const sel = picked[kind];
+  const box = $(ids[0]);
+  box.textContent = '';
+  for (const t of Object.keys(tagCounts).sort()) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'tag';
+    b.textContent = t;
+    b.setAttribute('aria-pressed', String(sel.has(t)));
+    const n = document.createElement('small');
+    n.textContent = tagCounts[t];
+    b.appendChild(n);
+    b.onclick = () => { sel.has(t) ? sel.delete(t) : sel.add(t); renderTags(kind); };
+    box.appendChild(b);
+  }
+  const n = sel.size ? poolFor([...sel]).length : 0;
+  $(ids[1]).disabled = !n;
+  $(ids[2]).textContent = sel.size ? `${sel.size} カテゴリ・${n} 問から出題` : 'カテゴリを選んでください';
+  $(ids[3]).hidden = !sel.size;
+}
+const selected = kind => Object.keys(tagCounts).sort().filter(t => picked[kind].has(t));
+function renderTimes() {
+  for (const b of $('ta-time').children) {
+    b.setAttribute('aria-checked', String(+b.dataset.sec === taTime));
+    b.onclick = () => { taTime = +b.dataset.sec; renderTimes(); };
+  }
+}
+
+function setup() {
+  stopTimer();
+  cond = null;
+  if (!QUIZZES.length) {
+    $('no-quiz').hidden = false;
+    document.querySelectorAll('#setup .panel').forEach(p => { p.hidden = true; });
+    show('setup');
+    return;
+  }
+  $('all-note').textContent = `全 ${QUIZZES.length} 問（${new Set(QUIZZES.map(q => q.file)).size} ページ）から出題`;
+  tagCounts = {};
+  for (const q of QUIZZES) for (const t of tagsOf[q.file] || []) tagCounts[t] = (tagCounts[t] || 0) + 1;
+  renderTags('cat');
+  renderTags('ta');
+  renderTimes();
+  show('setup');
+}
+
+// ---- 出題
+function start(c, questions) {
+  stopTimer();
+  cond = c;
+  const pool = poolFor(c.tags);
+  // タイムアタックは対象の全問をシャッフルして、時間か問題が尽きるまで出す
+  set = questions || (c.ta ? shuffle(pool) : shuffle(pool).slice(0, COUNT));
+  if (!set.length) return setup();
+  picks = c.ta ? [] : set.map(() => null);
+  pos = 0;
+  taEnd = null;
+  const url = new URL(location.href);
+  const params = new URLSearchParams();
+  for (const t of c.tags) params.append('tag', t);
+  if (c.ta) { params.set('mode', 'timeattack'); params.set('time', c.ta); }
+  else if (!c.tags.length) params.set('mode', 'random');
+  url.search = '?' + params;
+  history.replaceState(null, '', url);
+  $('cond').textContent = condLabel(c);
+  $('timer').hidden = !c.ta;
+  $('tally').hidden = !c.ta;
+  $('keys').hidden = !c.ta;
+  $('bar-box').classList.toggle('time', !!c.ta);
+  $('bar-box').classList.remove('warn');
+  $('timer').classList.remove('warn');
+  show('play');
+  if (c.ta) {
+    deadline = performance.now() + c.ta * 1000;
+    tick();
+    timerId = setInterval(tick, 100);
+    updateTally();
+  }
+  ask();
+}
+
+function stopTimer() {
+  if (timerId) clearInterval(timerId);
+  timerId = null;
+}
+// 残り時間を数字とバーで表示する（バーは残り時間に合わせて縮む）
+function tick() {
+  const left = Math.max(0, deadline - performance.now());
+  const warn = left <= 10000;
+  $('timer').textContent = (left / 1000).toFixed(1) + ' 秒';
+  $('timer').classList.toggle('warn', warn);
+  $('bar-box').classList.toggle('warn', warn);
+  $('bar').style.width = (left / (cond.ta * 1000) * 100) + '%';
+  if (!left) finishTA('time');
+}
+function updateTally() {
+  const ok = picks.filter((k, i) => k === set[i].answer).length;
+  $('tally').textContent = `正解 ${ok} / ${picks.length}`;
+}
+function finishTA(reason) {
+  if (!timerId) return;
+  const left = Math.max(0, deadline - performance.now()) / 1000;
+  stopTimer();
+  taEnd = { reason, left };
+  set = set.slice(0, picks.length);
+  result();
+}
+
+function ask() {
+  const q = set[pos];
+  if (cond.ta) {
+    $('count').textContent = `Q${pos + 1}`;
+  } else {
+    $('count').textContent = `${pos + 1} / ${set.length}`;
+    $('bar').style.width = (pos / set.length * 100) + '%';
+  }
+  $('from').textContent = q.title;
+  $('question').textContent = q.q;
+  $('feedback').hidden = true;
+  $('next').hidden = true;
+  $('keys-n').textContent = q.choices.length;
+  const box = $('choices');
+  box.textContent = '';
+  // 選択肢は毎回シャッフル（正解の位置で覚えないように）
+  for (const k of shuffle(q.choices.map((_, i) => i))) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'choice';
+    b.textContent = q.choices[k];
+    b.dataset.k = k;
+    b.onclick = () => answer(k);
+    box.appendChild(b);
+  }
+  if (!cond.ta) window.scrollTo({ top: 0 });
+}
+
+function answer(k) {
+  const q = set[pos];
+  // タイムアタック: 正誤も解説も出さず、すぐ次の問題へ（解説は結果でまとめて）
+  if (cond.ta) {
+    if (!timerId) return;
+    picks[pos] = k;
+    updateTally();
+    if (++pos < set.length) ask();
+    else finishTA('all');
+    return;
+  }
+  const ok = k === q.answer;
+  picks[pos] = k;
+  for (const b of $('choices').children) {
+    b.disabled = true;
+    if (+b.dataset.k === q.answer) b.classList.add('ok');
+    else if (+b.dataset.k === k) b.classList.add('ng');
+  }
+  const fb = $('feedback');
+  fb.textContent = '';
+  const v = document.createElement('b');
+  v.className = ok ? 'ok' : 'ng';
+  v.textContent = ok ? '⭕ 正解' : '❌ 不正解';
+  fb.append(v, (ok ? ' ' : `（正解: ${q.choices[q.answer]}） `) + (q.explain || ''));
+  if (!ok) fb.append(' ', refLink(q, 'メモを開く ↗'));
+  fb.hidden = false;
+  $('bar').style.width = ((pos + 1) / set.length * 100) + '%';
+  const next = $('next');
+  next.textContent = pos + 1 < set.length ? '次の問題 →' : '結果を見る →';
+  next.hidden = false;
+  next.focus({ preventScroll: true });
+}
+
+// 数字キーで選択肢を選ぶ（上から 1, 2, 3…）
+document.addEventListener('keydown', e => {
+  if ($('play').hidden || e.ctrlKey || e.metaKey || e.altKey) return;
+  const n = parseInt(e.key, 10);
+  const b = $('choices').children[n - 1];
+  if (b && !b.disabled) { e.preventDefault(); b.click(); }
+});
+
+$('next').onclick = () => {
+  if (++pos < set.length) ask();
+  else result();
+};
+$('quit').onclick = () => {
+  if (picks.some(p => p != null) && !confirm('途中でやめますか？')) return;
+  history.replaceState(null, '', location.pathname);
+  setup();
+};
+
+// ---- 結果
+function result() {
+  const ok = set.filter((q, i) => picks[i] === q.answer).length;
+  const s = $('score');
+  s.textContent = ok;
+  const total = document.createElement('small');
+  total.textContent = cond.ta ? ' 問正解' : ` / ${set.length}`;
+  s.appendChild(total);
+  if (cond.ta) {
+    const parts = [condLabel(cond)];
+    if (!set.length) parts.push('1 問も回答しませんでした');
+    else {
+      parts.push(`${set.length} 問に回答・正答率 ${Math.round(ok / set.length * 100)}%`);
+      if (taEnd && taEnd.reason === 'all') parts.push(`全問解き終えました（残り ${taEnd.left.toFixed(1)} 秒）`);
+    }
+    const best = getBest(cond);
+    if (set.length && (best == null || ok > best)) {
+      setBest(cond, ok);
+      if (getBest(cond) === ok) parts.push(best == null ? '自己ベストを記録しました' : `🎉 自己ベスト更新（前回まで ${best} 問）`);
+    } else if (best != null) parts.push(`自己ベスト ${best} 問`);
+    $('score-msg').textContent = parts.join('　');
+  } else {
+    $('score-msg').textContent = ok === set.length
+      ? '全問正解！'
+      : `${tagsLabel(cond.tags)}・正答率 ${Math.round(ok / set.length * 100)}%　間違えた問題はメモで確認できます`;
+  }
+  const list = $('review');
+  list.textContent = '';
+  set.forEach((q, i) => {
+    const good = picks[i] === q.answer;
+    const li = document.createElement('li');
+    const head = document.createElement('div');
+    head.className = 'rq';
+    const mark = document.createElement('b');
+    mark.className = good ? 'ok' : 'ng';
+    mark.textContent = good ? '⭕' : '❌';
+    head.append(mark, ` Q${i + 1}. ${q.q}`);
+    const ans = document.createElement('div');
+    ans.className = 'ra';
+    ans.textContent = '正解: ' + q.choices[q.answer] + (good ? '' : ' ／ あなたの答え: ' + q.choices[picks[i]]);
+    const src = document.createElement('div');
+    src.className = 'rs';
+    src.textContent = q.title + '　';
+    src.appendChild(refLink(q, 'メモを開く ↗'));
+    li.append(head, ans);
+    // タイムアタックは解き中に解説を出していないので、正解した問題にも解説を付ける
+    if ((!good || cond.ta) && q.explain) {
+      const ex = document.createElement('div');
+      ex.className = cond.ta && good ? 'rx' : 'ra';
+      ex.textContent = q.explain;
+      li.appendChild(ex);
+    }
+    li.appendChild(src);
+    list.appendChild(li);
+  });
+  const wrong = set.filter((q, i) => picks[i] !== q.answer);
+  $('retry-wrong').hidden = !wrong.length;
+  $('retry-wrong').textContent = cond.ta ? '間違えた問題を解説つきで解き直す' : '間違えた問題だけもう一度';
+  // 解き直しは 1 問ずつ解説が出る通常のモードで
+  $('retry-wrong').onclick = () => start({ tags: cond.tags, ta: 0 }, shuffle(wrong));
+  $('retry').textContent = cond.ta ? 'もう一度タイムアタック' : '同じ条件でもう一度';
+  show('result');
+  window.scrollTo({ top: 0 });
+}
+$('retry').onclick = () => start({ tags: cond.tags, ta: cond.ta });
+$('reset').onclick = () => { history.replaceState(null, '', location.pathname); setup(); };
+$('start-random').onclick = () => start({ tags: [], ta: 0 });
+$('ta-random').onclick = () => start({ tags: [], ta: taTime });
+$('start-cat').onclick = () => start({ tags: selected('cat'), ta: 0 });
+$('start-ta-cat').onclick = () => start({ tags: selected('ta'), ta: taTime });
+$('clear-cat').onclick = () => { picked.cat.clear(); renderTags('cat'); };
+$('clear-ta-cat').onclick = () => { picked.ta.clear(); renderTags('ta'); };
+
+// ---- 読み込んではじめる。URL から直接はじめることもできる
+// （quiz.html?tag=JavaScript&tag=Linux / quiz.html?mode=random / quiz.html?mode=timeattack&time=60&tag=JavaScript）
+(async () => {
+  try {
+    [MEMOS, QUIZZES] = await Promise.all([loadJSON('memos.json'), loadJSON('quizzes.json')]);
+  } catch (e) {
+    $('no-quiz').textContent = '問題を読み込めませんでした。ファイルを直接開いた場合や会話内のプレビューでは表示されません（memo.py preview quiz で埋め込んだ版を作れます）。';
+    MEMOS = [];
+    QUIZZES = [];
+  }
+  tagsOf = Object.fromEntries(MEMOS.map(m => [m.file, m.tags || []]));
+  const params = new URLSearchParams(location.search);
+  if (TA_TIMES.includes(+params.get('time'))) taTime = +params.get('time');
+  const known = new Set(Object.values(tagsOf).flat());
+  const tags = [...new Set(params.getAll('tag'))].filter(t => known.has(t)).sort();
+  const ta = params.get('mode') === 'timeattack';
+  for (const t of tags) picked[ta ? 'ta' : 'cat'].add(t);
+  setup();
+  if (QUIZZES.length) {
+    if (ta) start({ tags, ta: taTime });
+    else if (tags.length) start({ tags, ta: 0 });
+    else if (params.get('mode') === 'random') start({ tags: [], ta: 0 });
+  }
+})();
+</script>
+</body>
+</html>

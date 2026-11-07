@@ -12,14 +12,14 @@
   python3 scripts/memo.py list
   python3 scripts/memo.py config [KEY]                memo.config.json の設定を表示（例: config branch）
   python3 scripts/memo.py accent COLOR [LIGHT]        アクセント色を memo.config.json に書く（LIGHT を省くと自動。続けて build）
-  python3 scripts/memo.py preview MEMO|index|settings|roadmap|FILE [-o OUT]   会話内プレビュー用に 1 枚へ埋め込んだ HTML を作る
+  python3 scripts/memo.py preview MEMO|index|quiz|settings|roadmap|FILE [-o OUT]   会話内プレビュー用に 1 枚へ埋め込んだ HTML を作る
 
 MEMO / NAME は「docker」「docker.html」「src/docker.html」のどれでもよい
 （既存のファイルパスを渡した場合はそのファイルを対象にする）。
-置き場所（src/・dist/）やテンプレートの場所はこのスクリプトだけが知っている。
+置き場所（src/）やテンプレートの場所はこのスクリプトだけが知っている。
 サイト名・リポジトリ・ブランチ・タイムゾーンなど、サイトごとの値はリポジトリ直下の memo.config.json に書く。
 
-メモ = src/ 直下の *.html（index.html・settings.html・roadmap.html 以外）。src/ は原本だけを置く場所で、
+メモ = src/ 直下の *.html（index.html・quiz.html・settings.html・roadmap.html 以外）。src/ は原本だけを置く場所で、
 build は src/ を読むだけで書き換えない。公開するのは build が書き出す dist/（Actions が dist ブランチにデプロイする）。
 一覧情報は各メモの <head> 内の次のタグから読み取る:
   <title>                         タイトル（memo:title があればそちら優先）
@@ -27,8 +27,11 @@ build は src/ を読むだけで書き換えない。公開するのは build �
   <meta name="memo:tags">         カンマ区切りのタグ
   <meta name="memo:date">         YYYY-MM-DD
 
-build は一覧を dist/memos.json、Markdown 版を dist/md/ と dist/llms.txt に書き出し、
-トップページはその一覧を読み込んで表示する。
+確認クイズ（任意）は <script type="application/json" id="memo-quiz"> に問題データだけを書く。
+表示用の UI は build が dist/ のページの末尾に入れる（CSS / JS 本体は src/assets/memo-quiz.*）。
+build は一覧を dist/memos.json、全問題を dist/quizzes.json、Markdown 版を dist/md/ と dist/llms.txt に書き出し、
+トップページと quiz.html はそれらを読み込んで表示する。
+memo.config.json の quiz が false なら、quizzes.json・quiz.html・クイズの表示は作らない。
 あわせて、アプリ（claude.ai）に置く入口スキル dist/entry-skill/SKILL.md も memo.config.json から生成する。
 
 このファイルはコマンドの入口だけで、処理の本体は scripts/memolib/ にある。
@@ -110,10 +113,10 @@ def cmd_build(args) -> int:
     warning = repository_warning()
     if warning:
         print(warning, file=sys.stderr)
-    want, n_memos = dist_outputs()
+    want, n_memos, n_quizzes = dist_outputs()
     added, changed, removed = sync_dist(want, args.check)
     names = added + changed + [f"{n}（削除）" for n in removed]
-    summary = f"（{n_memos} 件）"
+    summary = f"（{n_memos} 件、" + (f"クイズ {n_quizzes} 問）" if CONFIG["quiz"] else "クイズはオフ）")
     if args.check:
         if names:
             shown = ", ".join(names[:10]) + (f" ほか {len(names) - 10} ファイル" if len(names) > 10 else "")
@@ -177,13 +180,6 @@ def cmd_config(args) -> int:
     return 0
 
 
-def cmd_list(_args) -> int:
-    for p in memo_files():
-        m = read_meta(p)
-        print(f"{m['date'] or '----------'}  {m['file']:<28} {m['title']}  [{', '.join(m['tags'])}]")
-    return 0
-
-
 def cmd_accent(args) -> int:
     """アクセント色だけを書き換える（設定ページから動かす Actions の「Set accent color」も使う）。
     ページへの反映は build が行う。"""
@@ -192,6 +188,13 @@ def cmd_accent(args) -> int:
     auto = "" if cfg["branding"]["accent_light"] else "（accent から自動）"
     print(f"{CONFIG_FILE.name} を更新: accent={dark} accent_light={light}{auto}")
     print("ページに反映するには python3 scripts/memo.py build を実行する")
+    return 0
+
+
+def cmd_list(_args) -> int:
+    for p in memo_files():
+        m = read_meta(p)
+        print(f"{m['date'] or '----------'}  {m['file']:<28} {m['title']}  [{', '.join(m['tags'])}]")
     return 0
 
 
@@ -267,8 +270,8 @@ def main() -> int:
     p = sub.add_parser("list", help="メモ一覧を表示")
     p.set_defaults(func=cmd_list)
 
-    p = sub.add_parser("preview", help="一覧データを埋め込んだ 1 枚の HTML を書き出す（会話内プレビュー用）")
-    p.add_argument("src", help="メモ名・index・settings・roadmap、または下書きの HTML ファイル")
+    p = sub.add_parser("preview", help="クイズの JS/CSS や一覧データを埋め込んだ 1 枚の HTML を書き出す（会話内プレビュー用）")
+    p.add_argument("src", help="メモ名・index・quiz・settings・roadmap、または下書きの HTML ファイル")
     p.add_argument("-o", "--out", help="出力先（省略時は一時フォルダの memo-preview/）")
     p.set_defaults(func=cmd_preview)
 

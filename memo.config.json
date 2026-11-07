@@ -6,6 +6,7 @@
   "branch": "master",
   "deploy_branch": "dist",
   "utc_offset_hours": 9,
+  "quiz": false,
   "roadmap": false,
   "branding": {
     "accent": "#00d4ff",

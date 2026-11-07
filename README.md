@@ -3,7 +3,8 @@
 Claude に作ってもらった図解つきの解説ページ（HTML）を、GitHub Pages で公開・蓄積するためのキットです。
 このリポジトリは **テンプレートリポジトリ** なので、「Use this template」から自分のリポジトリを作って使います。
 
-- トップページ: `src/index.html`（メモ一覧・検索・タグ絞り込み）
+- トップページ: `src/index.html`（メモ一覧・検索・タグ絞り込み。クイズがオンならランダムクイズも）
+- クイズ（オプション）: `src/quiz.html` と各メモの確認クイズ。`memo.config.json` の `"quiz"` で切り替える。このサイトは `false`（クイズのページ・データ・表示を作らない）
 - 設定ページ: `src/settings.html`（アクセント色を候補から選ぶか自分で決めて試し、GitHub Actions でサイト全体に固定する。下の「アクセント色を変える」）
 - ロードマップ（オプション）: `src/roadmap.html`（書いたメモとこれから書くテーマのチェックリスト。メモを公開すると自動でチェックが付く。`memo.config.json` の `"roadmap"` を `true` にすると公開され、トップページからリンクされる。詳しくは [memo-detail.md の「ロードマップ（オプション）」](memo-detail.md#ロードマップオプション)）
 - AI 向けの Markdown 版: `dist/md/` と `dist/llms.txt`（公開 URL を渡せば、リポジトリを繋いでいない会話でも Claude が過去のメモを読める）
@@ -31,7 +32,7 @@ GitHub でこのリポジトリの「Use this template」→「Create a new repo
 ### 2. サンプルを消す
 
 ```bash
-find src -maxdepth 1 -name '*.html' ! -name index.html ! -name settings.html ! -name roadmap.html -delete   # サンプルのメモ
+find src -maxdepth 1 -name '*.html' ! -name index.html ! -name quiz.html ! -name settings.html ! -name roadmap.html -delete   # サンプルのメモ
 rm -rf dist                                                                                  # 生成物（build で作り直す。コミットはされない）
 ```
 
@@ -46,6 +47,7 @@ rm -rf dist                                                                     
   "branch": "main",
   "deploy_branch": "dist",
   "utc_offset_hours": 9,
+  "quiz": false,
   "roadmap": false,
   "branding": { "accent": "#00d4ff", "accent_light": "#0077b6", "theme": "dark" }
 }
@@ -54,6 +56,7 @@ rm -rf dist                                                                     
 - `repository` は自分の `owner/name`。テンプレートの値（`repo/sample`）のままだと `build` が警告します。
 - `branch` はリポジトリのデフォルトブランチ（スキルの push 先）。
 - `deploy_branch` は `build` の出力を置く公開用のブランチ（既定 `dist`。Actions が作る）。`branch` と同じにはできません。
+- `quiz` は確認クイズを使うか（既定 `true`）。`false` にすると、クイズのページ（`quiz.html`）・全問題のデータ・各メモのクイズ表示・トップページのランダムクイズを作りません。
 - `roadmap` はロードマップのページ（`src/roadmap.html`）を公開するか。`false`（既定）なら公開せず、トップページにもリンクを出しません。
 - 書き間違い（JSON の書式・型・範囲）は、`memo.py` を実行したときにどの項目をどう直すかを示して止まります。
 - `branding` はサイト全体のアクセント色と、アイコン・OGP 画像の文字・色です。
