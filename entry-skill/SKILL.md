@@ -1,12 +1,12 @@
 ---
-name: "back-of-the-flyer"
-description: "taka1156/back-of-the-flyer（CheatSheet）に関する依頼の入口。HTMLで図解してまとめる、CheatSheetに保存、ファクトチェックなど。手順はGitHubのリポジトリから取得して従う。"
+name: "cheatsheet"
+description: "taka1156/cheatsheet（CheatSheet）に関する依頼の入口。HTMLで図解してまとめる、CheatSheetに保存、ファクトチェックなど。手順はGitHubのリポジトリから取得して従う。"
 ---
 <!-- scripts/memo.py build が memo.config.json から自動生成。手で編集しない -->
 
-# back-of-the-flyer（入口スキル）
+# cheatsheet（入口スキル）
 
-このスキルには手順もデザイン規約も書かない。**信頼できる唯一の情報源は GitHub の `taka1156/back-of-the-flyer` リポジトリ**。毎回そこから最新版を取得し、そこに書かれたスキルに従う。
+このスキルには手順もデザイン規約も書かない。**信頼できる唯一の情報源は GitHub の `taka1156/cheatsheet` リポジトリ**。毎回そこから最新版を取得し、そこに書かれたスキルに従う。
 
 ## 使う場面
 
@@ -25,13 +25,13 @@ description: "taka1156/back-of-the-flyer（CheatSheet）に関する依頼の入
 作業用ディレクトリに浅くクローンする（すでにあれば更新）。
 
 ```bash
-git clone --depth 1 https://github.com/taka1156/back-of-the-flyer.git back-of-the-flyer 2>/dev/null || git -C back-of-the-flyer pull -q
+git clone --depth 1 https://github.com/taka1156/cheatsheet.git cheatsheet 2>/dev/null || git -C cheatsheet pull -q
 ```
 
 クローンできない環境では、raw URL を WebFetch で読む（README → 必要なスキルの順）。
 
-- https://raw.githubusercontent.com/taka1156/back-of-the-flyer/master/README.md
-- https://raw.githubusercontent.com/taka1156/back-of-the-flyer/master/.claude/skills/<スキル名>/SKILL.md
+- https://raw.githubusercontent.com/taka1156/cheatsheet/master/README.md
+- https://raw.githubusercontent.com/taka1156/cheatsheet/master/.claude/skills/<スキル名>/SKILL.md
 
 どちらも取得できなかったら、作り始める前にその旨を伝えて止まる。**記憶で手順や規約を再現しない。**
 
@@ -43,4 +43,4 @@ git clone --depth 1 https://github.com/taka1156/back-of-the-flyer.git back-of-th
 
 選んだスキルの `SKILL.md` を最後まで読み、その手順どおりに進める。保存するかどうか・いつ保存するかも README とスキルの記述に従う（このスキル側では決めない）。
 
-リポジトリに書き込む手順（登録・修正・push）に進むときは、`taka1156/back-of-the-flyer` を push 権限付きでセッションに追加してから行う。
+リポジトリに書き込む手順（登録・修正・push）に進むときは、`taka1156/cheatsheet` を push 権限付きでセッションに追加してから行う。
