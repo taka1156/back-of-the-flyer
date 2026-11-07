@@ -1,21 +1,13 @@
 [
  {
-  "file": "sample.html",
-  "title": "サンプルのメモ",
-  "desc": "テスト用のサンプル。図と別メモへのリンクを含む",
+  "file": "vite-plus.html",
+  "title": "Vite+ と vp コマンド チートシート",
+  "desc": "Vite・Vitest・Oxlint などを 1 つにまとめた Vite+ の機能と、vp コマンドの使い方を用途別に一覧にしたチートシート。",
   "tags": [
-   "サンプル",
-   "テスト"
+   "Vite",
+   "JavaScript",
+   "ツール"
   ],
-  "date": "2026-01-10"
- },
- {
-  "file": "sample-plain.html",
-  "title": "最小のメモ",
-  "desc": "テスト用のサンプル。本文だけの最小のページ",
-  "tags": [
-   "テスト"
-  ],
-  "date": "2026-01-05"
+  "date": "2026-11-07"
  }
 ]

@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vite+ と vp コマンド チートシート</title>
+<meta name="description" content="Vite・Vitest・Oxlint などを 1 つにまとめた Vite+ の機能と、vp コマンドの使い方を用途別に一覧にしたチートシート。">
+<meta name="memo:tags" content="Vite, JavaScript, ツール">
+<meta name="memo:date" content="2026-11-07">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Noto+Sans+JP:wght@400;500;700&display=swap">
+<style>
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --fg: #1c2230;
+  --fg-2: #5a6376;
+  --line: #dde1e8;
+  --accent: #0077b6; /* 実際の色は memo.config.json の branding で決まり、memo:head が上書きする */
+  --chip: #eceff4;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0a0e14;
+    --surface: #111823;
+    --fg: #cdd9e5;
+    --fg-2: #7d8b9d;
+    --line: #1e2d3d;
+    --accent: #00d4ff;
+    --chip: #18222f;
+  }
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: 'Noto Sans JP', system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.7;
+  padding: 40px 16px 72px;
+}
+.wrap { max-width: 880px; margin: 0 auto; }
+h1 {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: clamp(1.2rem, 4vw, 1.6rem);
+  color: var(--accent);
+  letter-spacing: 0.06em;
+}
+.subtitle { color: var(--fg-2); font-size: 0.85rem; margin: 4px 0 28px; }
+h2 {
+  font-size: 1.1rem;
+  margin: 36px 0 12px;
+  padding-left: 10px;
+  border-left: 3px solid var(--accent);
+}
+p { margin: 8px 0; }
+code {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.85em;
+  background: var(--chip);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+pre {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.8rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px 14px;
+  overflow-x: auto;
+}
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px 18px;
+}
+.summary { border-left: 3px solid var(--accent); }
+.summary li { margin-left: 1.2em; }
+
+/* タブ */
+.tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
+.tab {
+  border: 1px solid var(--line);
+  background: var(--chip);
+  color: var(--fg-2);
+  border-radius: 999px;
+  padding: 5px 14px;
+  font: 600 0.78rem 'JetBrains Mono', ui-monospace, monospace;
+  cursor: pointer;
+}
+.tab[aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+.panel[hidden] { display: none; }
+
+/* 構成図 */
+.stack { display: grid; gap: 10px; }
+.vp-bar {
+  text-align: center; padding: 10px; border-radius: 10px;
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+  border: 1px solid var(--accent);
+  font: 700 0.95rem 'JetBrains Mono', ui-monospace, monospace; color: var(--accent);
+}
+.vp-bar small { display: block; font: 400 0.75rem 'Noto Sans JP', sans-serif; color: var(--fg-2); }
+.tools { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+.tool {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+  padding: 8px 10px; font-size: 0.8rem; line-height: 1.5;
+}
+.tool b { display: block; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 0.82rem; color: var(--accent); }
+.tool span { color: var(--fg-2); }
+.arrow { text-align: center; color: var(--fg-2); font-size: 0.75rem; }
+.base { background: var(--chip); border-radius: 8px; padding: 8px 10px; font-size: 0.8rem; text-align: center; }
+
+/* 機能カード */
+.features { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+.features .card h3 { font-size: 0.92rem; margin-bottom: 4px; }
+.features .card p { font-size: 0.83rem; color: var(--fg-2); margin: 0; }
+.features .card code { font-size: 0.78rem; }
+
+/* チートシート表 */
+.cheat { width: 100%; border-collapse: collapse; font-size: 0.83rem; }
+.cheat th, .cheat td { text-align: left; vertical-align: top; padding: 7px 8px; border-bottom: 1px solid var(--line); }
+.cheat th { font-size: 0.72rem; color: var(--fg-2); font-weight: 600; }
+.cheat td:first-child { white-space: nowrap; }
+.cheat td:first-child code { background: none; padding: 0; color: var(--accent); }
+.panel.card { padding: 6px 10px; overflow-x: auto; }
+.filter { width: 100%; margin: 0 0 10px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px;
+  background: var(--surface); color: var(--fg); font: inherit; font-size: 0.85rem; }
+.hint { font-size: 0.75rem; color: var(--fg-2); }
+@media (max-width: 520px) { .cheat td:first-child { white-space: normal; word-break: break-all; } }
+
+/* よくある誤解 */
+.myth { display: grid; gap: 8px; }
+.myth .card { font-size: 0.85rem; }
+.myth .card b { color: var(--accent); }
+.src { font-size: 0.8rem; }
+.src a { color: var(--accent); }
+
+footer#memo-backlink {
+  margin-top: 40px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+  text-align: center;
+}
+footer#memo-backlink a {
+  display: inline-block;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--chip);
+  color: var(--fg-2);
+  font: 600 12px/1.4 'JetBrains Mono', ui-monospace, monospace;
+  letter-spacing: .08em;
+  text-decoration: none;
+}
+footer#memo-backlink a:hover { color: var(--accent); }
+</style>
+<!-- memo:head（scripts/memo.py が自動生成。手で編集しない） -->
+<link rel="icon" href="assets/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-title" content="MemoKit">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="MemoKit">
+<meta property="og:title" content="Vite+ と vp コマンド チートシート">
+<meta property="og:description" content="Vite・Vitest・Oxlint などを 1 つにまとめた Vite+ の機能と、vp コマンドの使い方を用途別に一覧にしたチートシート。">
+<meta property="og:url" content="https://repo.github.io/sample/vite-plus.html">
+<meta property="og:image" content="https://repo.github.io/sample/assets/og.png?v=258752a2">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<style id="memo-accent">html:root{--accent:#0077b6}@media (prefers-color-scheme: dark){html:root{--accent:#00d4ff}}</style>
+<!-- /memo:head -->
+</head>
+<body>
+<div class="wrap">
+  <h1>Vite+ / vp チートシート</h1>
+  <p class="subtitle">Web 開発のツール一式を 1 つの <code>vp</code> コマンドにまとめた Vite+ の機能と使い方</p>
+
+  <div class="card summary">
+    <strong>ざっくり言うと</strong>
+    <ul>
+      <li>Vite・Rolldown・Vitest・tsdown・Oxlint・Oxfmt・Vite Task を <code>vp</code> 1 つから使う統合ツールチェーン（MIT ライセンス）</li>
+      <li>Node.js とパッケージマネージャー（pnpm / npm / yarn / bun）の版も自動で管理する</li>
+      <li>設定は <code>vite.config.ts</code> 1 つにまとめる（lint・fmt・test・pack・タスクも同じファイル）</li>
+    </ul>
+  </div>
+
+  <h2 id="stack">構成：vp の下で何が動くか</h2>
+  <div class="stack">
+    <div class="vp-bar">vp<small>1 つの CLI ＋ vite.config.ts 1 つ</small></div>
+    <div class="arrow">↓ コマンドごとに中のツールを呼ぶ</div>
+    <div class="tools">
+      <div class="tool"><b>vp dev / build / preview</b><span>Vite ＋ Rolldown</span></div>
+      <div class="tool"><b>vp test</b><span>Vitest</span></div>
+      <div class="tool"><b>vp lint</b><span>Oxlint</span></div>
+      <div class="tool"><b>vp fmt</b><span>Oxfmt</span></div>
+      <div class="tool"><b>vp check</b><span>Oxfmt ＋ Oxlint ＋ 型チェック（tsgo）</span></div>
+      <div class="tool"><b>vp pack</b><span>tsdown ＋ Rolldown</span></div>
+      <div class="tool"><b>vp run</b><span>Vite Task（キャッシュ付きタスク実行）</span></div>
+      <div class="tool"><b>vp install / add …</b><span>pnpm・npm・yarn・bun を自動で選ぶ</span></div>
+    </div>
+    <div class="arrow">↓ 実行環境</div>
+    <div class="base"><b>vp env</b> … Node.js とパッケージマネージャーの版を管理（プロジェクトごとに固定できる）</div>
+  </div>
+
+  <h2 id="features">主な機能</h2>
+  <div class="features">
+    <div class="card"><h3>開発とビルド</h3><p>Vite と Rolldown がベース。HMR、大きなアプリ向けの全体バンドル開発モード（オプトイン）、Vite のプラグインがそのまま使える。</p></div>
+    <div class="card"><h3>チェック</h3><p><code>vp check</code> でフォーマット・lint・型チェックを一度に。Prettier 互換のフォーマット、ESLint 互換のルール 750 以上、型情報を使う lint。</p></div>
+    <div class="card"><h3>テスト</h3><p>Vitest がベース。Jest 互換の API、既定でテストを分離、ブラウザモード、カバレッジ、スナップショット、型テスト。import は <code>vite-plus/test</code> から。</p></div>
+    <div class="card"><h3>タスク実行</h3><p><code>vp run</code> がワークスペース全体の依存の順にタスクを実行し、結果をキャッシュ。入力ファイル・引数・指定した環境変数が同じなら実行を飛ばして出力を再生する。</p></div>
+    <div class="card"><h3>ライブラリのパッケージ化</h3><p><code>vp pack</code> で型定義の生成、package.json の exports の自動生成、単体の実行ファイル、バンドルしない変換だけのモード。</p></div>
+    <div class="card"><h3>環境の管理</h3><p>Node.js とパッケージマネージャーをプロジェクトに合わせて自動で使い分ける。<code>vp env pin</code> で版を固定、<code>vp env off</code> で管理をやめられる。</p></div>
+    <div class="card"><h3>Git フック</h3><p><code>vp config</code> でフックを入れ、<code>vp staged</code> でステージしたファイルだけチェック。lint-staged の代わりになる。</p></div>
+    <div class="card"><h3>フレームワーク</h3><p>React・Vue・Svelte・Solid など Vite ベースのもの、メタフレームワーク、Nitro、Vercel・Netlify・Cloudflare などで使える。</p></div>
+  </div>
+
+  <h2 id="cheatsheet">vp コマンド チートシート</h2>
+  <input class="filter" id="filter" type="search" placeholder="絞り込み（例: cache, -D, ウォッチ）… 全タブから探す" aria-label="コマンドを絞り込む">
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" aria-selected="true" data-panel="t-setup">セットアップ</button>
+    <button class="tab" role="tab" aria-selected="false" data-panel="t-pkg">パッケージ</button>
+    <button class="tab" role="tab" aria-selected="false" data-panel="t-dev">開発・ビルド</button>
+    <button class="tab" role="tab" aria-selected="false" data-panel="t-check">チェック・テスト</button>
+    <button class="tab" role="tab" aria-selected="false" data-panel="t-run">タスク・キャッシュ</button>
+    <button class="tab" role="tab" aria-selected="false" data-panel="t-env">環境・Git フック</button>
+  </div>
+  <div class="panel card" id="t-setup">
+<table class="cheat"><thead><tr><th>コマンド</th><th>やること</th></tr></thead><tbody>
+<tr><td><code>curl -fsSL https://vite.plus | bash</code></td><td>グローバル CLI を入れる（macOS / Linux）。入れたら新しいシェルで <code>vp help</code></td></tr>
+<tr><td><code>irm https://vite.plus/ps1 | iex</code></td><td>グローバル CLI を入れる（Windows PowerShell）</td></tr>
+<tr><td><code>vp</code></td><td>引数なしで対話式のメニューを開く</td></tr>
+<tr><td><code>vp create</code></td><td>対話式で新しいアプリ・パッケージ・モノレポを作る</td></tr>
+<tr><td><code>vp create vite:application</code></td><td>組み込みテンプレート（<code>vite:monorepo</code> / <code>vite:application</code> / <code>vite:library</code> / <code>vite:generator</code>）</td></tr>
+<tr><td><code>vp create vite -- --template react-ts</code></td><td><code>--</code> の後ろはテンプレート側に渡る</td></tr>
+<tr><td><code>vp create --list</code></td><td>使えるテンプレートを表示</td></tr>
+<tr><td><code>vp create … --no-interactive --package-manager pnpm</code></td><td>質問なしで作る。<code>--directory</code>・<code>--no-git</code>・<code>--no-hooks</code>・<code>--agent</code>・<code>--editor</code> も指定できる</td></tr>
+<tr><td><code>vp migrate</code></td><td>今のプロジェクトを Vite+ に移行（依存・import・設定・スクリプトを書き換えてフォーマット）</td></tr>
+<tr><td><code>vp migrate --no-interactive</code></td><td>質問なしで移行。モノレポはワークスペースのルートで実行</td></tr>
+<tr><td><code>vp migrate --agent claude --editor zed</code></td><td>移行時にエージェント用の指示ファイルとエディタ設定も書く</td></tr>
+<tr><td><code>pnpm exec vp check</code></td><td>グローバル CLI を入れず、プロジェクトの vite-plus 経由で使う</td></tr>
+</tbody></table>
+  </div>
+  <div class="panel card" id="t-pkg" hidden>
+<table class="cheat"><thead><tr><th>コマンド</th><th>やること</th></tr></thead><tbody>
+<tr><td><code>vp install</code></td><td>package.json とロックファイルどおりに入れる（パッケージマネージャーは自動で選ばれる）</td></tr>
+<tr><td><code>vp install --frozen-lockfile</code></td><td>ロックファイルの変更が必要なら失敗させる（CI 向け）</td></tr>
+<tr><td><code>vp install --filter web</code></td><td>モノレポの一部だけ。<code>-w</code> はワークスペースのルート</td></tr>
+<tr><td><code>vp add react</code></td><td><code>dependencies</code> に追加</td></tr>
+<tr><td><code>vp add -D typescript vitest</code></td><td><code>devDependencies</code> に追加。<code>--save-peer</code> で peer に</td></tr>
+<tr><td><code>vp remove react</code></td><td>削除。<code>--filter web</code> で特定のパッケージから</td></tr>
+<tr><td><code>vp update</code></td><td>依存を新しい版に。<code>vp outdated</code> で更新できるものを表示</td></tr>
+<tr><td><code>vp dedupe</code></td><td>重複した依存をまとめる</td></tr>
+<tr><td><code>vp why react</code></td><td>なぜ入っているかを表示</td></tr>
+<tr><td><code>vp info react</code></td><td>レジストリの情報（版・dist-tag）を表示</td></tr>
+<tr><td><code>vp list</code></td><td>入っているパッケージ。<code>-g</code> でグローバル</td></tr>
+<tr><td><code>vp pm audit --json</code></td><td><code>vp pm &lt;command&gt;</code> で、検出したパッケージマネージャーに合わせてコマンドを実行（追加のオプションは <code>--</code> の後ろに書くと、そのマネージャーへ渡る）</td></tr>
+</tbody></table>
+  </div>
+  <div class="panel card" id="t-dev" hidden>
+<table class="cheat"><thead><tr><th>コマンド</th><th>やること</th></tr></thead><tbody>
+<tr><td><code>vp dev</code></td><td>Vite の開発サーバーを起動（HMR）</td></tr>
+<tr><td><code>vp build</code></td><td>本番ビルド。<code>--watch</code>・<code>--sourcemap</code></td></tr>
+<tr><td><code>vp preview</code></td><td><code>vp build</code> の結果をローカルで配信して確かめる</td></tr>
+<tr><td><code>vp pack</code></td><td>ライブラリをビルド（tsdown）</td></tr>
+<tr><td><code>vp pack src/index.ts --dts</code></td><td>型定義（.d.ts）も出す</td></tr>
+<tr><td><code>vp pack --watch</code></td><td>変更を見て作り直す</td></tr>
+<tr><td><code>vp pack --exe</code></td><td>単体で動く実行ファイルを作る（Node.js 25.7.0 以上。<code>vp env use 26</code>）</td></tr>
+</tbody></table>
+  </div>
+  <div class="panel card" id="t-check" hidden>
+<table class="cheat"><thead><tr><th>コマンド</th><th>やること</th></tr></thead><tbody>
+<tr><td><code>vp check</code></td><td>フォーマット → lint → 型チェックをまとめて実行</td></tr>
+<tr><td><code>vp check --fix</code></td><td>フォーマットと自動修正をかける（ファイルが変わる）</td></tr>
+<tr><td><code>vp check --deny-warnings</code></td><td>lint の警告もエラー扱い。<code>--quiet</code> で警告を隠す</td></tr>
+<tr><td><code>vp check --no-fmt --no-lint</code></td><td>型チェックだけ（<code>typeAware</code> と <code>typeCheck</code> が有効なとき）</td></tr>
+<tr><td><code>vp check --fix src/index.ts</code></td><td>オプションはファイルパスより前に書く</td></tr>
+<tr><td><code>vp lint</code></td><td>Oxlint だけ実行。<code>--fix</code>・<code>--type-aware</code></td></tr>
+<tr><td><code>vp fmt</code></td><td>Oxfmt でフォーマット。<code>--check</code> で確認だけ</td></tr>
+<tr><td><code>vp test</code></td><td>Vitest を 1 回だけ実行（既定ではウォッチしない）</td></tr>
+<tr><td><code>vp test watch</code></td><td>ウォッチモードで実行</td></tr>
+<tr><td><code>vp test run --coverage</code></td><td>カバレッジ付きで実行</td></tr>
+<tr><td><code>vp staged</code></td><td>ステージしたファイルにだけチェック（設定は <code>staged</code>）。<code>--fail-on-changes</code></td></tr>
+</tbody></table>
+  </div>
+  <div class="panel card" id="t-run" hidden>
+<table class="cheat"><thead><tr><th>コマンド</th><th>やること</th></tr></thead><tbody>
+<tr><td><code>vp run build</code></td><td>タスク（vite.config.ts の <code>run.tasks</code> か package.json の scripts）を実行。省略形 <code>vpr build</code></td></tr>
+<tr><td><code>vp run -r build</code></td><td>全ワークスペースで依存の順に実行</td></tr>
+<tr><td><code>vp run -t @my/app#build</code></td><td>そのパッケージと依存先だけ</td></tr>
+<tr><td><code>vp run --filter "@my/*" --filter "!@my/utils" build</code></td><td>名前・glob・ディレクトリで選ぶ。<code>!</code> で除外、<code>...</code> で依存も含める</td></tr>
+<tr><td><code>vp run -w build</code></td><td>ワークスペースのルートで実行</td></tr>
+<tr><td><code>vp run --cache build</code></td><td>package.json の scripts もキャッシュする（既定はしない）</td></tr>
+<tr><td><code>vp run --no-cache build</code></td><td>今回だけキャッシュを使わない</td></tr>
+<tr><td><code>vp run -r --parallel dev</code></td><td>依存を無視して全部同時に起動</td></tr>
+<tr><td><code>vp run -r --concurrency-limit 8 build</code></td><td>同時実行数（既定 4）</td></tr>
+<tr><td><code>vp run -r -v build</code></td><td>詳しい実行結果を表示。<code>--last-details</code> で前回分</td></tr>
+<tr><td><code>vp run test --reporter verbose</code></td><td>タスク名の後ろの引数はコマンドに渡る</td></tr>
+<tr><td><code>vp cache clean</code></td><td>タスクのキャッシュ（node_modules/.vite/task-cache）を消す</td></tr>
+<tr><td><code>vp exec tsc --noEmit</code></td><td>プロジェクトに入っているコマンドを実行（ダウンロードしない）</td></tr>
+<tr><td><code>vpx eslint .</code></td><td>手元にあれば使い、無ければ取ってきて実行（npx 相当。TS ファイルも実行できる）</td></tr>
+<tr><td><code>vp dlx create-vite</code></td><td>依存に追加せずにパッケージを取ってきて 1 回だけ実行</td></tr>
+</tbody></table>
+  </div>
+  <div class="panel card" id="t-env" hidden>
+<table class="cheat"><thead><tr><th>コマンド</th><th>やること</th></tr></thead><tbody>
+<tr><td><code>vp env setup</code></td><td>Node.js とパッケージマネージャーの切り替え用シム・シェル設定を作る</td></tr>
+<tr><td><code>vp env pin lts pnpm@10</code></td><td>プロジェクトの版を固定（既にある <code>.node-version</code>・<code>packageManager</code> はそこを更新し、無ければ package.json の <code>devEngines</code> に書く。<code>--target</code> で書き込み先を選べる）</td></tr>
+<tr><td><code>vp env use 20 pnpm@10</code></td><td>今のシェルだけ版を切り替え。<code>--unset</code> で戻す</td></tr>
+<tr><td><code>vp env install</code></td><td>固定した版を入れる</td></tr>
+<tr><td><code>vp env default lts</code></td><td>グローバルの既定の版</td></tr>
+<tr><td><code>vp env current --json</code></td><td>今どの版が使われているか</td></tr>
+<tr><td><code>vp env which node</code></td><td>実際に使われるコマンドのパス</td></tr>
+<tr><td><code>vp env list-remote --lts</code></td><td>入れられる版の一覧</td></tr>
+<tr><td><code>vp env doctor</code></td><td>環境の診断</td></tr>
+<tr><td><code>vp env off</code></td><td>Vite+ の管理をやめてシステムの Node.js などを優先（<code>vp env on</code> で戻す）</td></tr>
+<tr><td><code>vp node -e "console.log(1+1)"</code></td><td>解決された Node.js で実行</td></tr>
+<tr><td><code>vp toolchain</code></td><td>プロジェクトで使っているツールの版を表示（<code>--global</code> でグローバル）</td></tr>
+<tr><td><code>vp config</code></td><td>Git フックとエージェント連携をセットアップ。<code>--no-hooks</code>・<code>--no-agent</code></td></tr>
+<tr><td><code>vp hooks status</code></td><td>フックの状態。<code>enable</code> / <code>disable</code></td></tr>
+<tr><td><code>vp upgrade</code></td><td>グローバルの vp を更新。<code>--check</code>・<code>--rollback</code>・<code>vp upgrade &lt;version&gt;</code></td></tr>
+<tr><td><code>vp implode</code></td><td>グローバルの Vite+ と関連データを削除</td></tr>
+</tbody></table>
+  </div>
+  <p class="hint">組み込みコマンド（<code>dev</code>・<code>build</code>・<code>test</code> など）は package.json の同名スクリプトでは上書きできない。スクリプトの方を動かすときは <code>vp run dev</code>。</p>
+
+  <h2 id="config">設定：vite.config.ts 1 つにまとめる</h2>
+  <pre>import { defineConfig } from 'vite-plus';
+
+export default defineConfig({
+  server: {},             // Vite の開発サーバー（build・preview も同じ）
+  lint: {                  // Oxlint
+    ignorePatterns: ['dist/**'],
+    options: { typeAware: true, typeCheck: true },  // vp check で型チェックもする
+  },
+  fmt: { singleQuote: true },          // Oxfmt
+  check: { fmt: false },               // vp check でフォーマットを飛ばす（任意）
+  test: { include: ['src/**/*.test.ts'] },  // Vitest
+  pack: { dts: true, format: ['esm', 'cjs'] }, // tsdown
+  staged: { '*': 'vp check --fix' },   // vp staged（コミット前）
+  run: {                   // Vite Task
+    tasks: {
+      build: { command: 'vp build', dependsOn: ['lint'], cache: { env: ['NODE_ENV'] } },
+      deploy: { command: 'deploy-script --prod', cache: false, dependsOn: ['build', 'test'] },
+    },
+  },
+});</pre>
+  <p class="hint"><code>vitest.config.ts</code>・<code>.oxlintrc.json</code>・<code>.oxfmtrc.json</code>・<code>tsdown.config.ts</code> を別に置くのは推奨されていない。<code>defaultPackage: './frontend'</code> で、引数なしの <code>vp dev</code> などの対象ディレクトリを決められる。</p>
+
+  <h2 id="myths">よくある誤解</h2>
+  <div class="myth">
+    <div class="card"><b>「vp test はウォッチし続ける」</b> → Vitest 単体と違い、<code>vp test</code> は 1 回実行して終わる。ウォッチは <code>vp test watch</code>。</div>
+    <div class="card"><b>「vp dev で package.json の dev スクリプトが動く」</b> → <code>vp dev</code> は常に組み込みの Vite 開発サーバー。スクリプトは <code>vp run dev</code>。</div>
+    <div class="card"><b>「package.json の scripts も自動でキャッシュされる」</b> → 既定でキャッシュされるのは vite.config.ts の <code>run.tasks</code> だけ。scripts は <code>vp run --cache</code> が必要。同じ名前のタスクを両方に書くことはできない。</div>
+    <div class="card"><b>「環境変数が変わればキャッシュは無効になる」</b> → キャッシュのキーになるのは <code>cache.env</code> に書いた変数だけ。ただし <code>vp build</code> は <code>VITE_*</code> と <code>NODE_ENV</code> を自動で伝えるので、それらは書かなくてよい。それ以外で結果が変わる変数は <code>cache.env</code> に書いておく。</div>
+    <div class="card"><b>「vp upgrade でプロジェクトの Vite+ も上がる」</b> → <code>vp upgrade</code> はグローバルの <code>vp</code> だけ。プロジェクトの <code>vite-plus</code> は別に更新する（<code>vp toolchain</code> で版を確認）。</div>
+  </div>
+
+  <h2 id="sources">出典</h2>
+  <p class="src"><a href="https://viteplus.dev/">viteplus.dev</a> ・ <a href="https://viteplus.dev/guide/">Getting Started</a> ・ <a href="https://viteplus.dev/config/">Config</a> ・ <a href="https://viteplus.dev/guide/run">Run</a> ・ <a href="https://viteplus.dev/guide/cache">Cache</a> ・ <a href="https://viteplus.dev/guide/env">Env</a> ・ <a href="https://viteplus.dev/guide/vpx">vpx</a>（2026-11-07 時点）</p>
+
+  <footer id="memo-backlink"><a href="index.html">&larr; 一覧に戻る</a></footer>
+</div>
+
+<script>
+document.querySelectorAll('.tabs').forEach(group => {
+  group.addEventListener('click', e => {
+    const tab = e.target.closest('.tab');
+    if (!tab) return;
+    group.querySelectorAll('.tab').forEach(t => {
+      const on = t === tab;
+      t.setAttribute('aria-selected', String(on));
+      document.getElementById(t.dataset.panel).hidden = !on;
+    });
+  });
+});
+
+// 絞り込み：入力があれば全タブの行から探し、該当する行だけ出す
+const filter = document.getElementById('filter');
+const panels = [...document.querySelectorAll('.panel')];
+const tabs = [...document.querySelectorAll('.tab')];
+filter.addEventListener('input', () => {
+  const q = filter.value.trim().toLowerCase();
+  document.querySelector('.tabs').style.display = q ? 'none' : '';
+  panels.forEach(p => {
+    let hit = 0;
+    p.querySelectorAll('tbody tr').forEach(tr => {
+      const ok = !q || tr.textContent.toLowerCase().includes(q);
+      tr.hidden = !ok;
+      if (ok) hit++;
+    });
+    const selected = tabs.find(t => t.dataset.panel === p.id).getAttribute('aria-selected') === 'true';
+    p.hidden = q ? hit === 0 : !selected;
+  });
+});
+</script>
+
+</body>
+</html>
