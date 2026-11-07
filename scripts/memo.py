@@ -11,24 +11,21 @@
   python3 scripts/memo.py build [--check]
   python3 scripts/memo.py list
   python3 scripts/memo.py config [KEY]                memo.config.json の設定を表示（例: config branch）
-  python3 scripts/memo.py preview MEMO|index|quiz|FILE [-o OUT]   会話内プレビュー用に 1 枚へ埋め込んだ HTML を作る
+  python3 scripts/memo.py preview MEMO|index|FILE [-o OUT]   会話内プレビュー用に 1 枚へ埋め込んだ HTML を作る
 
 MEMO / NAME は「docker」「docker.html」「docs/docker.html」のどれでもよい
 （既存のファイルパスを渡した場合はそのファイルを対象にする）。
 置き場所（docs/）やテンプレートの場所はこのスクリプトだけが知っている。
 サイト名・リポジトリ・ブランチ・タイムゾーンなど、サイトごとの値はリポジトリ直下の memo.config.json に書く。
 
-メモ = docs/ 直下の *.html（index.html・quiz.html 以外）。docs/ が GitHub Pages で公開される。
+メモ = docs/ 直下の *.html（index.html 以外）。docs/ が GitHub Pages で公開される。
 一覧情報は各メモの <head> 内の次のタグから読み取る:
   <title>                         タイトル（memo:title があればそちら優先）
   <meta name="description">       説明
   <meta name="memo:tags">         カンマ区切りのタグ
   <meta name="memo:date">         YYYY-MM-DD
 
-確認クイズ（任意）は <script type="application/json" id="memo-quiz"> に問題データだけを書く。
-表示用の UI はページ末尾に自動で入れる（CSS / JS 本体は docs/assets/memo-quiz.*）。
-build は一覧を docs/memos.json、全問題を docs/quizzes.json に書き出し、
-トップページと quiz.html はそれらを読み込んで表示する。
+build は一覧を docs/memos.json に書き出し、トップページはそれを読み込んで表示する。
 あわせて、アプリ（claude.ai）に置く入口スキル entry-skill/SKILL.md も memo.config.json から生成する。
 
 このファイルはコマンドの入口だけで、処理の本体は scripts/memolib/ にある。
@@ -51,8 +48,7 @@ from memolib.entry import entry_skill
 from memolib.lint import lint_text
 from memolib.markdown import MD_DIR, build_markdown
 from memolib.meta import set_meta, memo_files, memo_path, read_meta
-from memolib.site import (MEMOS_JSON, QUIZZES_JSON, strip_fence, memos_json, preview_text,
-                          quizzes_json, site_data)
+from memolib.site import MEMOS_JSON, strip_fence, memos_json, preview_text, site_data
 
 def cmd_lint(args) -> int:
     bad = 0
@@ -121,14 +117,14 @@ def cmd_build(args) -> int:
                 p.write_text(new, encoding="utf-8")
     if stale:
         print(("自動生成ブロックが古い: " if args.check else "自動生成ブロックを更新: ") + ", ".join(stale))
-    memos, quizzes = site_data()
+    memos = site_data()
     outdated = []
-    for path, body in ((MEMOS_JSON, memos_json(memos, quizzes)), (QUIZZES_JSON, quizzes_json(quizzes))):
-        if not path.is_file() or read_text(path) != body:
-            outdated.append(path.name)
-            if not args.check:
-                path.write_text(body, encoding="utf-8")
-    for page in SPECIAL_PAGES:  # トップ・クイズページは head（アイコン・OGP）とサイト設定だけ更新する
+    body = memos_json(memos)
+    if not MEMOS_JSON.is_file() or read_text(MEMOS_JSON) != body:
+        outdated.append(MEMOS_JSON.name)
+        if not args.check:
+            MEMOS_JSON.write_text(body, encoding="utf-8")
+    for page in SPECIAL_PAGES:  # トップページは head（アイコン・OGP）とサイト設定だけ更新する
         if not page.is_file():
             continue
         src = read_text(page)
@@ -156,9 +152,9 @@ def cmd_build(args) -> int:
     if entry_changed:
         print(f"入口スキルを更新: {entry_name[0]}")
     if outdated:
-        print(f"{', '.join(outdated)} を更新（{len(memos)} 件、クイズ {len(quizzes)} 問）")
+        print(f"{', '.join(outdated)} を更新（{len(memos)} 件）")
     elif not md_changed and not entry_changed:
-        print(f"変更なし（{len(memos)} 件、クイズ {len(quizzes)} 問）")
+        print(f"変更なし（{len(memos)} 件）")
     return 0
 
 
@@ -273,7 +269,7 @@ def main() -> int:
     p.add_argument("--date", nargs="?", const="", help="YYYY-MM-DD（値なしで今日。タイムゾーンは memo.config.json）")
     p.set_defaults(func=cmd_meta)
 
-    p = sub.add_parser("build", help="一覧データ（memos.json・quizzes.json）・Markdown 版・入口スキルを再生成")
+    p = sub.add_parser("build", help="一覧データ（memos.json）・Markdown 版・入口スキルを再生成")
     p.add_argument("--check", action="store_true")
     p.set_defaults(func=cmd_build)
 
@@ -284,8 +280,8 @@ def main() -> int:
     p = sub.add_parser("list", help="メモ一覧を表示")
     p.set_defaults(func=cmd_list)
 
-    p = sub.add_parser("preview", help="クイズの JS/CSS や一覧データを埋め込んだ 1 枚の HTML を書き出す（会話内プレビュー用）")
-    p.add_argument("src", help="メモ名・index・quiz、または下書きの HTML ファイル")
+    p = sub.add_parser("preview", help="一覧データを埋め込んだ 1 枚の HTML を書き出す（会話内プレビュー用）")
+    p.add_argument("src", help="メモ名・index、または下書きの HTML ファイル")
     p.add_argument("-o", "--out", help="出力先（省略時は一時フォルダの memo-preview/）")
     p.set_defaults(func=cmd_preview)
 

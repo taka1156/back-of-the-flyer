@@ -14,7 +14,7 @@ import unittest
 
 from helpers import ENTRY_REL, REPO, Workspace, diff_names, repo_has_memos, repo_snapshot
 
-GENERATED_BLOCKS = (r"<!-- memo:head.*?<!-- /memo:head -->\n?", r"<!-- memo:quiz.*?<!-- /memo:quiz -->\n?")
+GENERATED_BLOCKS = (r"<!-- memo:head.*?<!-- /memo:head -->\n?",)
 
 
 def strip_generated(ws: Workspace) -> None:
@@ -24,7 +24,7 @@ def strip_generated(ws: Workspace) -> None:
         for pat in GENERATED_BLOCKS:
             text = re.sub(pat, "", text, flags=re.S)
         page.write_text(text, encoding="utf-8")
-    for name in ("memos.json", "quizzes.json", "llms.txt"):
+    for name in ("memos.json", "llms.txt"):
         (ws.docs / name).unlink()
     for md in (ws.docs / "md").glob("*.md"):
         md.unlink()
@@ -78,27 +78,28 @@ class BuildTest(unittest.TestCase):
     def test_memos_json_matches_list(self):
         with Workspace() as ws:
             memos = json.loads((ws.docs / "memos.json").read_text(encoding="utf-8"))
-            quizzes = json.loads((ws.docs / "quizzes.json").read_text(encoding="utf-8"))
             listed = ws.run("list").stdout.splitlines()
             self.assertEqual(len(memos), len(listed))
-            self.assertEqual(sum(m["quizzes"] for m in memos), len(quizzes))
             dates = [m["date"] for m in memos]
             self.assertEqual(dates, sorted(dates, reverse=True), "memos.json は日付の新しい順")
             files = {m["file"] for m in memos}
-            self.assertTrue({q["file"] for q in quizzes} <= files)
             self.assertNotIn("index.html", files)
-            self.assertNotIn("quiz.html", files)
+            self.assertTrue(all("quizzes" not in m for m in memos))
 
-    def test_sample_quizzes_are_collected(self):
+    def test_build_removes_legacy_quiz(self):
+        """廃止したクイズの表示ブロックと問題データが残っていても、build が取り除く。"""
         with Workspace() as ws:
-            quizzes = json.loads((ws.docs / "quizzes.json").read_text(encoding="utf-8"))
-            self.assertEqual([q["file"] for q in quizzes], ["sample.html"] * 3)
-            self.assertEqual([q["answer"] for q in quizzes], [1, 0, 2])
-            memos = {m["file"]: m for m in json.loads((ws.docs / "memos.json").read_text(encoding="utf-8"))}
-            self.assertEqual(memos["sample.html"]["quizzes"], 3)
-            self.assertEqual(memos["sample-plain.html"]["quizzes"], 0)
-            self.assertIn("<!-- memo:quiz", (ws.docs / "sample.html").read_text(encoding="utf-8"))
-            self.assertNotIn("<!-- memo:quiz", (ws.docs / "sample-plain.html").read_text(encoding="utf-8"))
+            page = ws.docs / "sample.html"
+            original = page.read_text(encoding="utf-8")
+            legacy = ("<!-- memo:quiz（scripts/memo.py が自動生成。手で編集しない） -->\n"
+                      '<link rel="stylesheet" href="assets/memo-quiz.css">\n<!-- /memo:quiz -->\n'
+                      '<script type="application/json" id="memo-quiz">'
+                      '[{"q":"秘密の問題","choices":["a","b"],"answer":0}]</script>\n')
+            page.write_text(original.replace("</body>", legacy + "</body>"), encoding="utf-8")
+            ws.run("build")
+            self.assertEqual(page.read_text(encoding="utf-8"), original)
+            self.assertNotIn("秘密の問題", (ws.docs / "md" / "sample.md").read_text(encoding="utf-8"))
+            self.assertFalse((ws.docs / "quizzes.json").exists())
 
     def test_removed_memo_disappears_from_outputs(self):
         with Workspace() as ws:
@@ -108,7 +109,6 @@ class BuildTest(unittest.TestCase):
             self.assertFalse((ws.docs / "md" / "sample.md").exists())
             memos = json.loads((ws.docs / "memos.json").read_text(encoding="utf-8"))
             self.assertNotIn("sample.html", {m["file"] for m in memos})
-            self.assertNotIn("sample.html", (ws.docs / "quizzes.json").read_text(encoding="utf-8"))
             self.assertNotIn("md/sample.md", (ws.docs / "llms.txt").read_text(encoding="utf-8"))
 
     def test_check_reports_stale_without_writing(self):
@@ -132,7 +132,7 @@ class NewAddMetaTest(unittest.TestCase):
     def test_invalid_and_reserved_names_are_rejected(self):
         with Workspace() as ws:
             before = ws.snapshot()
-            for name in ("Bad_Name", "index", "quiz", "a--b"):
+            for name in ("Bad_Name", "index", "a--b"):
                 with self.subTest(name=name):
                     p = ws.run("new", name, check=False)
                     self.assertNotEqual(p.returncode, 0)
@@ -206,54 +206,47 @@ class LintTest(unittest.TestCase):
             self.assertTrue(text.startswith("<!DOCTYPE html>"))
             self.assertIn("* { margin: 0 }", text)
             self.assertIn('"Noto Sans JP"', text)
-            for needle in ('<meta charset="UTF-8">', 'name="viewport"', 'id="memo-backlink"',
-                           "<!-- memo:head", "<!-- memo:quiz", "assets/memo-quiz.js"):
+            for needle in ('<meta charset="UTF-8">', 'name="viewport"', 'id="memo-backlink"', "<!-- memo:head"):
                 self.assertIn(needle, text)
+            self.assertNotIn("memo-quiz", text)  # 廃止したクイズの問題データは消える
             again = ws.run("lint", str(draft), check=False)
             self.assertEqual(again.returncode, 0, again.stdout)
             self.assertIn("OK", again.stdout)
 
-    def test_lint_reports_quiz_problems(self):
+    def test_lint_reports_missing_meta(self):
         with Workspace() as ws:
             draft = ws.root / "draft.html"
             draft.write_text(
                 '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>T</title></head><body>'
-                '<a href="index.html">x</a>'
-                '<script type="application/json" id="memo-quiz">'
-                '[{"q":"Q","choices":["a","b"],"answer":0,"ref":"#nowhere"}]</script></body></html>',
+                '<a href="index.html">x</a></body></html>',
                 encoding="utf-8")
             p = ws.run("lint", str(draft), check=False)
             self.assertEqual(p.returncode, 1)
-            self.assertIn("#nowhere", p.stdout)
             self.assertIn("説明", p.stdout)
 
 
 class PreviewTest(unittest.TestCase):
-    def test_memo_preview_inlines_quiz_assets(self):
+    def test_memo_preview_writes_copy_without_touching_source(self):
         with Workspace() as ws:
             src_before = (ws.docs / "sample.html").read_bytes()
             out = ws.root / "out" / "sample.html"
             ws.run("preview", "sample", "-o", str(out))
             text = out.read_text(encoding="utf-8")
-            self.assertNotIn("assets/memo-quiz.css", text)
-            self.assertNotIn("assets/memo-quiz.js", text)
-            self.assertIn("#memo-quiz-ui", text)  # CSS の中身
-            self.assertIn("function refLink", text)  # JS の中身
+            self.assertIn("<!-- memo:head", text)
+            self.assertNotIn("window.MEMO_DATA", text)
             self.assertEqual((ws.docs / "sample.html").read_bytes(), src_before)
 
-    def test_index_and_quiz_preview_embed_data(self):
+    def test_index_preview_embeds_data(self):
         with Workspace() as ws:
             memos = json.loads((ws.docs / "memos.json").read_text(encoding="utf-8"))
-            for page in ("index", "quiz"):
-                with self.subTest(page=page):
-                    out = ws.root / f"{page}.html"
-                    ws.run("preview", page, "-o", str(out))
-                    text = out.read_text(encoding="utf-8")
-                    m = re.search(r"window\.MEMO_DATA = (.*?);\n</script>", text, re.S)
-                    self.assertIsNotNone(m)
-                    data = json.loads(m.group(1))
-                    self.assertEqual(data["memos.json"], memos)
-                    self.assertLess(text.index("window.MEMO_DATA"), text.index("loadJSON"))
+            out = ws.root / "index.html"
+            ws.run("preview", "index", "-o", str(out))
+            text = out.read_text(encoding="utf-8")
+            m = re.search(r"window\.MEMO_DATA = (.*?);\n</script>", text, re.S)
+            self.assertIsNotNone(m)
+            data = json.loads(m.group(1))
+            self.assertEqual(data, {"memos.json": memos})
+            self.assertLess(text.index("window.MEMO_DATA"), text.index("loadJSON"))
 
     def test_preview_refuses_to_overwrite_source(self):
         with Workspace() as ws:
@@ -288,14 +281,11 @@ class SiteConfigTest(unittest.TestCase):
     def test_site_values_are_filled_into_pages(self):
         with Workspace() as ws:
             index = (ws.docs / "index.html").read_text(encoding="utf-8")
-            quiz = (ws.docs / "quiz.html").read_text(encoding="utf-8")
             self.assertIn('<title data-memo-site="{site_name}">TEST MEMO</title>', index)
             self.assertIn('>テスト用のメモ置き場</p>', index)
             self.assertIn('href="https://github.com/example/test-memo"', index)
             self.assertIn('<meta property="og:site_name" content="TEST MEMO">', index)
             self.assertIn('<meta property="og:url" content="https://memo.example.com/">', index)
-            self.assertIn(">TEST MEMO クイズ</title>", quiz)
-            self.assertIn('content="TEST MEMO の確認クイズから', quiz)
             llms = (ws.docs / "llms.txt").read_text(encoding="utf-8")
             self.assertTrue(llms.startswith("# TEST MEMO\n\n> テスト用のメモの集まり。\n"))
 
@@ -314,7 +304,7 @@ class SiteConfigTest(unittest.TestCase):
             self.assertIn('content="https://alice.github.io/notes/"', index)
             sample = (ws.docs / "sample.html").read_text(encoding="utf-8")
             self.assertIn('<meta property="og:site_name" content="NOTES">', sample)
-            for page_text in (index, sample, (ws.docs / "quiz.html").read_text(encoding="utf-8")):
+            for page_text in (index, sample):
                 self.assertIn("html:root{--accent:#aa3300}", page_text)
                 self.assertIn("html:root{--accent:#ff5500}}", page_text)
             entry = (ws.root / ENTRY_REL).read_text(encoding="utf-8")

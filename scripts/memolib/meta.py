@@ -74,7 +74,7 @@ def memo_path(arg: str, must_exist: bool = True) -> Path:
     if not NAME_RE.match(name):
         sys.exit(f"ファイル名は英小文字・数字・ハイフンのみ: {name!r}")
     if f"{name}.html" in SPECIAL_NAMES:
-        sys.exit(f"{name}.html は特別なページです（{'トップ' if name == 'index' else 'クイズ'}）。メモ名に使えません")
+        sys.exit(f"{name}.html は特別なページです（トップ）。メモ名に使えません")
     target = DOCS / f"{name}.html"
     if must_exist and not target.is_file():
         sys.exit(f"見つかりません: {target.relative_to(ROOT)}")

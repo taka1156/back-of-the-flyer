@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import re
 
-from .blocks import BACKLINK, BACKLINK_ID, apply_head, apply_quiz, read_quiz
+from .blocks import BACKLINK, BACKLINK_ID, apply_head, strip_quiz
 
 CURLY = "‘’“”"
 
@@ -91,12 +91,9 @@ def lint_text(text: str, backlink: bool, filename: str = "") -> tuple[str, list[
         if new != text:
             fixed.append("アイコン・OGP の head タグを追加／更新")
             text = new
-        new = apply_quiz(text)
+        new = strip_quiz(text)
         if new != text:
-            fixed.append("クイズの表示ブロック（memo:quiz）を追加／更新")
+            fixed.append("廃止したクイズの表示ブロックと問題データを削除")
             text = new
-
-    _qs, quiz_problems = read_quiz(text)
-    problems.extend(f"クイズ: {p}" for p in quiz_problems)
 
     return text, fixed, problems

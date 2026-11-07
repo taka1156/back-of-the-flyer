@@ -7,7 +7,7 @@ docs/ と memo.config.json を対象にする。
 作業用リポジトリは 2 種類:
 
 - Workspace()          仕組みのテスト用。仕組みのファイル（scripts/、テンプレート、docs/ の index.html・
-                       quiz.html・assets/）に、tests/fixtures/ のサンプルのメモと設定を組み合わせて build したもの。
+                       assets/）に、tests/fixtures/ のサンプルのメモと設定を組み合わせて build したもの。
                        本物のメモが 1 本もなくても（仕組みだけを取り出したリポジトリでも）動く。
 - Workspace(real=True) このリポジトリの docs/ と設定をそのままコピーしたもの。コミットされている生成物が
                        最新かどうかなど、本物の中身を確かめるテストと tests/snapshot.py が使う。
@@ -28,7 +28,7 @@ TEMPLATE_REL = Path(".claude/skills/memo-style/template.html")
 CONFIG_NAME = "memo.config.json"
 ENTRY_REL = Path("entry-skill/SKILL.md")
 # docs/ のうち、メモではなく仕組みの一部として持っていくもの
-MECHANISM_DOCS = ("index.html", "quiz.html", "assets")
+MECHANISM_DOCS = ("index.html", "assets")
 GIT_ENV = {"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.com",
            "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@example.com"}
 

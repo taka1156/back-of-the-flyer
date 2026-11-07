@@ -57,7 +57,6 @@ python3 scripts/memo.py lint NAME --fix --backlink
 報告だけのもの（`[要対応]`）:
 - JS 内の全角クォート疑い → `memo.py path NAME` のファイルを読み、文字列の区切りに使われていれば半角に直す。日本語の文中の使用ならそのまま。
 - タイトル・説明・タグ・日付の欠落 → 次の手順で付ける。
-- `クイズ:` で始まるもの → 問題データ（`<script type="application/json" id="memo-quiz">`）の JSON の崩れや `ref` の飛び先の誤り。memo-style の「確認クイズ」の書式どおりに直す。
 
 ほかにも明らかな崩れ（閉じタグ欠落、Markdown 記号の混入など）に気づいたら、内容は変えずに直す。
 
@@ -79,21 +78,17 @@ python3 scripts/memo.py meta NAME \
 - **date**: `--date` を値なしで渡すと今日（`memo.config.json` のタイムゾーン。実行環境の時計が UTC でもずれない）。登録後は `memo.py list` で日付を確認する。
 - `meta` を実行すると OGP タグも自動で更新される。`<!-- memo:head -->` 〜 `<!-- /memo:head -->` は手で編集しない。
 
-## 5.5 確認クイズを付ける
-
-問題データ（`id="memo-quiz"`）がなければ、memo-style の「確認クイズ」を読み、中身から 3〜5 問を作って `</body>` の直前に書く（作問ルールに従い、年号などの雑学は出さない。`ref` の飛び先の見出しに `id` がなければ付ける）。表示用のブロックは次の lint / build で自動で入る。ユーザーが「クイズはいらない」と言った場合は付けない。
-
 ## 6. 一覧を更新して確認
 
 ```bash
 python3 scripts/memo.py lint NAME   # OK になること
-python3 scripts/memo.py build       # 一覧データ（memos.json・quizzes.json）を再生成
+python3 scripts/memo.py build       # 一覧データ（memos.json）を再生成
 python3 scripts/memo.py list
 ```
 
-`docs/memos.json`・`docs/quizzes.json`（トップページとクイズページが読み込む一覧・問題）は自動生成なので手で編集しない。ページ末尾の `<!-- memo:quiz -->` 〜 `<!-- /memo:quiz -->`（クイズの表示部分。本体は `docs/assets/memo-quiz.*` を参照）も自動生成。
+`docs/memos.json`（トップページが読み込む一覧）は自動生成なので手で編集しない。
 
-登録したページを会話内で見せるときは、ファイルをそのまま送らず `python3 scripts/memo.py preview NAME -o <スクラッチパッド>/NAME.html` で作った 1 枚版を送る（そのままだとクイズの JS/CSS が届かず動かない）。
+登録したページを会話内で見せるときは、ファイルをそのまま送らず `python3 scripts/memo.py preview NAME -o <スクラッチパッド>/NAME.html` で作った 1 枚版を送る（アイコン・OGP・アクセント色の自動生成ブロックが最新になる）。
 
 ## 7. commit / push
 
@@ -112,5 +107,4 @@ push 後に GitHub Actions も一覧を再生成するが、ローカルで buil
 ユーザーには短く伝える:
 - 追加した名前・タイトル・タグ
 - lint で直した点（あれば 1 行で）
-- 付けたクイズの問題数
 - 公開 URL: `python3 scripts/memo.py url NAME` の出力（独自ドメインは `docs/CNAME` から決まる。URL を手で組み立てない）
