@@ -33,7 +33,7 @@ python3 scripts/memo.py path NAME     # 実ファイルのパス
 ## 2. サブエージェントを起動する
 
 - **1 メモにつき 1 サブエージェント**。複数あるときは並列に起動する（同時に走らせるのは 5 本程度まで。残りは終わり次第起動）。
-- サブエージェントには**メモのファイルパス（HTML と Markdown 版）と下の「検証用プロンプト」だけ**を渡す。Markdown 版のパスは `python3 scripts/memo.py path NAME --md`。未保存の作業用ファイルには Markdown 版がないので、`{MD_PATH}` の行を消して HTML だけ渡す。会話の経緯、書いたときの意図、書き手が自信のある/ない箇所などは渡さない（独立性を保つため）。
+- サブエージェントには**メモのファイルパス（HTML と Markdown 版）と下の「検証用プロンプト」だけ**を渡す。Markdown 版のパスは `python3 scripts/memo.py path NAME --md`（Markdown 版は build が作る。clone したばかりで `dist/md/NAME.md` が無いとき、または HTML を変えたあとは、渡す前に `python3 scripts/memo.py build` を実行する。最新かどうかは `build --check` で確かめられる）。未保存の作業用ファイルには Markdown 版がないので、`{MD_PATH}` の行を消して HTML だけ渡す。会話の経緯、書いたときの意図、書き手が自信のある/ない箇所などは渡さない（独立性を保つため）。
 - サブエージェントにはファイルを編集させない。報告だけさせる。
 
 ### サブエージェントが使えない環境

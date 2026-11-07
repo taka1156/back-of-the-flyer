@@ -52,7 +52,7 @@ python3 scripts/memo.py lint NAME --fix --backlink
 - `* {` が `- {` / `\*` に化けたもの（Markdown 経由のコピペで起きる）
 - `<!DOCTYPE html>` / charset / viewport の欠落
 - ページ下部フッターに「← 一覧に戻る」リンクを追加（`--backlink`）
-- ファビコン・iOS アイコン・OGP の `<head>` タグ（`<!-- memo:head -->` ブロック）を追加／更新。og:title / og:description は title / description から自動で作られる
+- 原本に紛れ込んだ自動生成ブロック（`<!-- memo:head -->`）を取り除く。ファビコン・iOS アイコン・OGP の `<head>` タグは build が `dist/` のページにだけ入れる（og:title / og:description は title / description から作られる）
 
 報告だけのもの（`[要対応]`）:
 - JS 内の全角クォート疑い → `memo.py path NAME` のファイルを読み、文字列の区切りに使われていれば半角に直す。日本語の文中の使用ならそのまま。
@@ -76,7 +76,7 @@ python3 scripts/memo.py meta NAME \
 - **desc**: 何がわかるページかを 1 文（40〜60 字）。
 - **tags**: 1〜3 個。表記ゆれを防ぐため、`memo.py list` に出ている既存タグに合うものがあれば再利用する（例: `Docker` と `docker` を混在させない）。
 - **date**: `--date` を値なしで渡すと今日（`memo.config.json` のタイムゾーン。実行環境の時計が UTC でもずれない）。登録後は `memo.py list` で日付を確認する。
-- `meta` を実行すると OGP タグも自動で更新される。`<!-- memo:head -->` 〜 `<!-- /memo:head -->` は手で編集しない。
+- OGP タグ（og:title / og:description）は、build が title / description から `dist/` のページに作る。`meta` は原本の title / description / タグ / 日付を書くだけで、`<!-- memo:head -->` ブロックは原本に書かない。
 
 ## 6. 一覧を更新して確認
 
