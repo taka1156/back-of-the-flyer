@@ -28,19 +28,19 @@ description: "taka1156/cheatsheet（CheatSheet）に関する依頼の入口。H
 git clone --depth 1 https://github.com/taka1156/cheatsheet.git cheatsheet 2>/dev/null || git -C cheatsheet pull -q
 ```
 
-クローンできない環境では、raw URL を WebFetch で読む（README → 必要なスキルの順）。
+クローンできない環境では、raw URL を WebFetch で読む（振り分けの表 → 必要なスキルの順）。
 
-- https://raw.githubusercontent.com/taka1156/cheatsheet/master/README.md
+- https://raw.githubusercontent.com/taka1156/cheatsheet/master/.claude/skills/ROUTING.md
 - https://raw.githubusercontent.com/taka1156/cheatsheet/master/.claude/skills/<スキル名>/SKILL.md
 
 どちらも取得できなかったら、作り始める前にその旨を伝えて止まる。**記憶で手順や規約を再現しない。**
 
 ### 2. どのスキルを使うか決める
 
-リポジトリの `README.md` を読み、「Claude に頼むとき」と「アプリ（claude.ai）から使うとき」の表で依頼に合うスキルを選ぶ。表に無い依頼なら `.claude/skills/` の各 SKILL.md の description を見て選ぶ。それでも合うものが無ければ、その旨を伝えて普通に対応する。
+リポジトリの `.claude/skills/ROUTING.md` を読み、「アプリ（claude.ai）の入口スキルから使うとき」の表で依頼に合うスキルを選ぶ。表に無い依頼なら `.claude/skills/` の各 SKILL.md の description を見て選ぶ。それでも合うものが無ければ、その旨を伝えて普通に対応する。
 
 ### 3. スキルに従う
 
-選んだスキルの `SKILL.md` を最後まで読み、その手順どおりに進める。保存するかどうか・いつ保存するかも README とスキルの記述に従う（このスキル側では決めない）。
+選んだスキルの `SKILL.md` を最後まで読み、その手順どおりに進める。保存するかどうか・いつ保存するかも `ROUTING.md` とスキルの記述に従う（このスキル側では決めない）。
 
 リポジトリに書き込む手順（登録・修正・push）に進むときは、`taka1156/cheatsheet` を push 権限付きでセッションに追加してから行う。
