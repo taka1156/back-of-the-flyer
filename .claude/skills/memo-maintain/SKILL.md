@@ -97,7 +97,7 @@ GitHub Actions は Python 3.12 で動く。手元に `python3.12` があれば�
 | ワークフロー | `memo-detail.md` の「GitHub Actions」 |
 | 設定の項目 | `memolib/config.py` の `DEFAULTS`、`memo-detail.md` の「サイトごとの設定」、テストの `tests/fixtures/memo.config.json` |
 | 仕組みとして残すファイル | `memo-detail.md` の「このキットから始める」、`tests/helpers.py` の `MECHANISM_DOCS` |
-| スキルの追加 | README の 2 つの表に 1 行ずつ |
+| スキルの追加 | `.claude/skills/ROUTING.md` の 2 つの表に 1 行ずつ |
 
 `memo-detail.md` の Mermaid の図を変えたら、描画できることを確かめる（構文エラーだと GitHub で図が出ない）。
 

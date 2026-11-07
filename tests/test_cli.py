@@ -366,7 +366,7 @@ class SiteConfigTest(unittest.TestCase):
                 self.assertIn("html:root{--accent:#ff5500}}", page_text)
             entry = ws.read(str(ENTRY_REL))
             self.assertIn("https://github.com/alice/notes.git notes", entry)
-            self.assertIn("raw.githubusercontent.com/alice/notes/trunk/README.md", entry)
+            self.assertIn("raw.githubusercontent.com/alice/notes/trunk/.claude/skills/ROUTING.md", entry)
             self.assertEqual(ws.run("url").stdout.strip(), "https://alice.github.io/notes/")
             self.assertEqual(ws.run("build", "--check", check=False).returncode, 0)
 
