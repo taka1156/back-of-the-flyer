@@ -1,19 +1,19 @@
-"""AI 向けの Markdown 版（docs/md/NAME.md と docs/llms.txt）の生成。"""
+"""AI 向けの Markdown 版（dist/md/NAME.md と dist/llms.txt）の生成。"""
 from __future__ import annotations
 
 import re
 from html.parser import HTMLParser
 
 from .blocks import BACKLINK_ID, strip_quiz
-from .config import CONFIG, DOCS, HEAD_RE, SITE_NAME, SITE_URL, SPECIAL_NAMES, read_text
+from .config import CONFIG, DIST, SRC, HEAD_RE, SITE_NAME, SITE_URL, SPECIAL_NAMES, read_text
 
 #
-# build は各メモの本文を Markdown にして docs/md/NAME.md に、全メモの目次を docs/llms.txt に書き出す。
+# build は各メモの本文を Markdown にして dist/md/NAME.md に、全メモの目次を dist/llms.txt に書き出す。
 # Claude などが HTML（CSS・SVG 込みで重い）を読まずに中身を把握できるようにするため。
 # 変換はファイルを触らない純粋関数（html_to_markdown）にしてあり、他の環境からも使い回せる。
 
-MD_DIR = DOCS / "md"
-LLMS_TXT = DOCS / "llms.txt"
+MD_DIR = DIST / "md"
+LLMS_TXT = DIST / "llms.txt"
 MD_NOTE = "<!-- scripts/memo.py build が自動生成。手で編集しない -->"
 
 _MD_SKIP_TAGS = {"head", "style", "script", "noscript", "template"}
@@ -323,21 +323,9 @@ def llms_txt(memos: list[dict]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def build_markdown(memos: list[dict], check: bool) -> list[str]:
-    """docs/md/*.md と docs/llms.txt を書き出し、変わった（check なら古い）ファイル名を返す。"""
+def markdown_outputs(memos: list[dict]) -> dict:
+    """dist/md/*.md と dist/llms.txt の中身（{書き出し先のパス: 中身}）。書き出しは build がまとめて行う。"""
     want = {MD_DIR / f"{m['file'][:-5]}.md": memo_markdown(
-        read_text(DOCS / m["file"]), m) for m in memos}
+        read_text(SRC / m["file"]), m) for m in memos}
     want[LLMS_TXT] = llms_txt(memos)
-    changed = []
-    for path, content in want.items():
-        if not path.is_file() or read_text(path) != content:
-            changed.append(str(path.relative_to(DOCS)))
-            if not check:
-                path.parent.mkdir(exist_ok=True)
-                path.write_text(content, encoding="utf-8")
-    for path in sorted(MD_DIR.glob("*.md")) if MD_DIR.is_dir() else []:
-        if path not in want:  # 消されたメモの Markdown 版
-            changed.append(str(path.relative_to(DOCS)) + "（削除）")
-            if not check:
-                path.unlink()
-    return changed
+    return want

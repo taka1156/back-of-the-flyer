@@ -1,6 +1,6 @@
 # memo.py の仕組み
 
-`scripts/memo.py` は、MEMO リポジトリのメモ（`docs/*.html`）を登録・点検し、一覧や AI 向けの Markdown 版を生成するツールです。
+`scripts/memo.py` は、MEMO リポジトリのメモ（原本は `src/*.html`）を登録・点検し、公開用のサイト一式（自動生成ブロック入りのページ・一覧・AI 向けの Markdown 版）を `dist/` に書き出すツールです。
 入口は `scripts/memo.py`、処理の本体は `scripts/memolib/` にあり、テストは `tests/` にあります。
 標準ライブラリだけで動き、どのディレクトリから実行してもかまいません。
 
@@ -27,62 +27,55 @@
 ## 基本の考え方
 
 - **原本は人（または Claude）が書く。それ以外はすべて生成する。** 原本は各メモの本文と `<head>` のメタ情報の 2 つだけで、一覧や Markdown 版、各ページに差し込むタグはスクリプトが作ります。生成されたものは手で編集しません（次の `build` で上書きされます）。
+- **原本と生成物は置き場所ごと分ける。** `src/` には原本だけを置き（自動生成ブロックも一覧データもないので、表示の確認は `build` して `dist/` で行う）、`build` は `src/` を読むだけで書き換えません。生成物はすべて `dist/`（`.gitignore` 済み）に書き出し、GitHub Actions がその中身を **dist ブランチ**にコミットします。原本のブランチ（`master`）に生成物や Actions のコミットは入りません。
 - **サイトごとの値は `memo.config.json` だけに書く。** サイト名・リポジトリ・ブランチ・タイムゾーンをコードやスキル、ページに直接書きません（[サイトごとの設定](#サイトごとの設定memoconfigjson)）。
 - **置き場所を知っているのはスクリプトだけ。** メモは名前（`docker` など）で指定し、パスは `memo.py path NAME` で引きます。スキル側でパスを組み立てません。
-- **公開されるのは `docs/` だけ。** GitHub Pages の公開元が `docs/` なので、スクリプト・スキル・このファイルは公開されません。
+- **公開されるのは `dist/` の中身だけ。** GitHub Pages の公開元は dist ブランチ（`dist/` の中身そのもの）なので、スクリプト・スキル・このファイルは公開されません。
 
 ## 全体像：原本と生成物
 
 ```mermaid
 flowchart LR
-  subgraph SRC["原本（手で書く）"]
+  subgraph SRC["master ブランチ・src/（原本。手で書く）"]
     direction TB
-    H["docs/NAME.html<br/>本文"]
-    M["&lt;head&gt; のメタ情報<br/>title / description /<br/>memo:tags / memo:date"]
-  end
-
-  subgraph COMMON["共通ファイル（手で書く・1 か所だけ）"]
-    direction TB
-    IMG["docs/assets/*.png・favicon.ico<br/>（branding/ から生成）"]
+    H["src/NAME.html<br/>本文・メタ情報"]
+    PG["src/index.html・roadmap.html"]
+    IMG["src/assets/*.png・favicon.ico<br/>（branding/ から生成）"]
     CFG["memo.config.json<br/>サイト名・リポジトリ・ブランチ"]
   end
 
-  B(["memo.py build"])
+  B(["memo.py build<br/>src/ は読むだけ"])
 
-  subgraph GEN["生成物（手で編集しない）"]
+  subgraph GEN["dist/（生成物。コミットしない）"]
     direction TB
-    MJ["docs/memos.json<br/>一覧"]
-    MD["docs/md/NAME.md<br/>docs/llms.txt"]
-    BLK["各メモの自動生成ブロック<br/>memo:head"]
-    ENT["entry-skill/SKILL.md<br/>アプリ側の入口スキル"]
+    MEMO["NAME.html・index.html など<br/>memo:head を差し込んだページ"]
+    MJ["memos.json"]
+    MD["md/NAME.md・llms.txt"]
+    ENT["entry-skill/SKILL.md"]
+    CP["assets/・CNAME・.nojekyll<br/>（src/ のコピー）"]
   end
 
-  subgraph PAGES["公開ページ"]
-    direction TB
-    IDX["docs/index.html<br/>一覧・検索"]
-    MEMO["docs/NAME.html<br/>各メモ"]
-  end
+  A(["GitHub Actions<br/>Deploy MEMO"])
+  S["dist ブランチ<br/>→ GitHub Pages"]
 
-  H --> B
-  M --> B
-  CFG --> B
-  B --> MJ & MD & BLK & ENT
-  B -->|サイト名などを差し込む| IDX
-  MJ -- fetch --> IDX
-  BLK --> MEMO
-  IMG -- 参照 --> MEMO
+  H & PG & IMG & CFG --> B
+  B --> MEMO & MJ & MD & ENT & CP
+  GEN --> A --> S
 ```
 
 | ファイル | 種類 | 作る人 | 中身 |
 | --- | --- | --- | --- |
-| `docs/NAME.html` | メモ | 人＋スクリプト | 本文とメタ情報は人が書く。`memo:head` ブロックはスクリプトが入れる |
-| `docs/index.html` | トップページ | 人＋スクリプト | 一覧・検索・タグ絞り込み。データは `memos.json` から読む。サイト名・説明・リポジトリへのリンクは `build` が `memo.config.json` から入れる |
-| `memo.config.json` | 設定 | 人 | サイト名・説明・リポジトリ・ブランチ・タイムゾーン |
-| `entry-skill/SKILL.md` | 生成物 | `build` | claude.ai のアプリ側に置く入口スキル（リポジトリ名とブランチ入り） |
-| `docs/memos.json` | 生成物 | `build` | 全メモのタイトル・説明・タグ・日付 |
-| `docs/md/NAME.md` | 生成物 | `build` | 各メモの本文を Markdown にしたもの |
-| `docs/llms.txt` | 生成物 | `build` | 全メモの目次（Markdown 版へのリンク） |
-| `docs/assets/*.png`・`favicon.ico` | 共通ファイル | `branding/render.py` | アイコンと OGP 画像 |
+| `src/NAME.html` | メモ（原本） | 人 | 本文とメタ情報。自動生成ブロックは入れない（`build` が `dist/` のページにだけ入れる） |
+| `src/index.html` | トップページ（原本） | 人 | 一覧・検索・タグ絞り込み。データは `memos.json` から読む。サイト名・説明・リポジトリへのリンクは `build` が `memo.config.json` から入れる |
+| `src/roadmap.html` | ロードマップ（原本・オプション） | 人 | 書いたメモと、これから書くテーマを分野ごとに並べたチェックリスト。`memo.config.json` の `roadmap` が `true` のときだけ公開し、トップページのフッターの「ロードマップ」から開く（[ロードマップ（オプション）](#ロードマップオプション)） |
+| `memo.config.json` | 設定 | 人 | サイト名・説明・リポジトリ・ブランチ・デプロイ先のブランチ・タイムゾーン・ロードマップ・アクセント色とアイコン/OGP 画像の文字 |
+| `dist/NAME.html` など | 生成物 | `build` | 原本に `memo:head` ブロックとサイト設定を差し込んだ公開用のページ |
+| `dist/entry-skill/SKILL.md` | 生成物 | `build` | claude.ai のアプリ側に置く入口スキル（リポジトリ名とブランチ入り） |
+| `dist/memos.json` | 生成物 | `build` | 全メモのタイトル・説明・タグ・日付 |
+| `dist/md/NAME.md` | 生成物 | `build` | 各メモの本文を Markdown にしたもの |
+| `dist/llms.txt` | 生成物 | `build` | 全メモの目次（Markdown 版へのリンク） |
+| `dist/assets/`・`CNAME`・`.nojekyll` | 生成物（コピー） | `build` | `src/` のページ以外のファイルをそのままコピーしたもの |
+| `src/assets/*.png`・`favicon.ico` | 共通ファイル | `branding/render.py` | アイコンと OGP 画像 |
 | `.claude/skills/memo-style/template.html` | テンプレート | 人 | `new` で新しいメモを作るときの雛形 |
 
 ## メモ 1 本の中身
@@ -93,7 +86,7 @@ flowchart LR
     direction TB
     h1["charset / viewport<br/>（無ければ lint が追加）"]
     h2["title・description・memo:tags・memo:date<br/>（手で書く or meta コマンド）"]
-    h3["&lt;!-- memo:head --&gt; ブロック<br/>アイコン・OGP・アクセント色（自動生成）"]
+    h3["&lt;!-- memo:head --&gt; ブロック<br/>アイコン・OGP・アクセント色（dist/ のページにだけ build が入れる）"]
     h4["&lt;style&gt; ページ固有の CSS"]
     h1 ~~~ h2 ~~~ h3 ~~~ h4
   end
@@ -127,18 +120,18 @@ python3 scripts/memo.py <コマンド> ...
 
 | コマンド | 使い方 | やること | ファイルを書き換えるか |
 | --- | --- | --- | --- |
-| `new` | `new NAME` | テンプレートから `docs/NAME.html` を作る | 作る |
-| `add` | `add SRC NAME [--force]` | 外部の HTML を `docs/NAME.html` として取り込む | 作る（`--force` で上書き） |
+| `new` | `new NAME` | テンプレートから `src/NAME.html` を作る | 作る |
+| `add` | `add SRC NAME [--force]` | 外部の HTML を `src/NAME.html` として取り込む | 作る（`--force` で上書き） |
 | `path` | `path NAME [--md]` | メモ（または Markdown 版）の絶対パスを表示 | しない |
 | `url` | `url [NAME]` | 公開 URL を表示 | しない |
 | `lint` | `lint MEMO... [--fix] [--backlink]` | 崩れのチェック。`--fix` で直せるものを直す | `--fix` のときだけ |
 | `meta` | `meta MEMO [--title] [--desc] [--tags] [--date]` | メタ情報を設定する | する |
-| `build` | `build [--check]` | 生成物をすべて作り直す。`--check` は古いかどうかだけ調べる | `--check` 以外はする |
+| `build` | `build [--check]` | `src/` から公開用のサイト一式を `dist/` に書き出す。`--check` は古いかどうかだけ調べる | `src/` はしない（`dist/` に書く） |
 | `list` | `list` | メモの一覧（日付・名前・タイトル・タグ）を表示 | しない |
-| `preview` | `preview MEMO\|index\|FILE [-o OUT]` | 自動生成ブロックを最新にし、トップページなら一覧データを埋め込んだ 1 枚の HTML を書き出す | 元のファイルはしない |
+| `preview` | `preview MEMO\|index\|roadmap\|FILE [-o OUT]` | 自動生成ブロックを入れ、トップページ・ロードマップなら一覧データを埋め込んだ 1 枚の HTML を書き出す | 元のファイルはしない |
 
-`MEMO` / `NAME` は `docker`・`docker.html`・`docs/docker.html` のどれでもよく、既存のファイルパスを渡せばそのファイルが対象になります（下書きの点検に使えます）。
-名前は英小文字・数字・ハイフンだけで、`index` はトップページなのでメモ名に使えません。
+`MEMO` / `NAME` は `docker`・`docker.html`・`src/docker.html` のどれでもよく、既存のファイルパスを渡せばそのファイルが対象になります（下書きの点検に使えます）。
+名前は英小文字・数字・ハイフンだけで、`index`・`roadmap` は特別なページなのでメモ名に使えません。
 
 ## 登録の流れ
 
@@ -149,28 +142,28 @@ sequenceDiagram
   autonumber
   actor U as 書き手（Claude）
   participant P as memo.py
-  participant D as docs/
+  participant D as src/
   participant G as GitHub
   participant A as GitHub Actions
   participant S as GitHub Pages
 
   U->>P: add 下書き.html NAME
-  P->>D: docs/NAME.html を作る（コードブロックの囲いは外す）
+  P->>D: src/NAME.html を作る（コードブロックの囲いは外す）
   U->>P: lint NAME --fix --backlink
-  P->>D: 崩れを直し、memo:head ブロックとフッターを入れる
+  P->>D: 崩れを直し、フッターを入れる（自動生成ブロックがあれば取り除く）
   P-->>U: 直せない問題（メタ情報の欠落など）を報告
   U->>P: meta NAME --title --desc --tags --date
-  P->>D: メタ情報を書き、memo:head（OGP）を作り直す
+  P->>D: メタ情報を書く
   U->>P: build
-  P->>D: memos.json・md/・llms.txt を作り直す
-  U->>G: commit / push
-  G->>A: docs/*.html などの変更で起動
-  A->>A: lint（報告のみ）→ build
-  A-->>G: 差分があればコミット（ローカルで build 済みなら差分なし）
-  G->>S: docs/ を公開
+  P-->>U: dist/ に公開用のサイト一式を書き出す（src/ は書き換えない。確認用）
+  U->>G: src/ の原本だけを commit / push
+  G->>A: src/ などの変更で起動（Deploy MEMO）
+  A->>A: lint（報告のみ）→ build で dist/ を作る
+  A->>G: dist/ の中身を dist ブランチにコミット（master には何もコミットしない）
+  G->>S: dist ブランチを公開
 ```
 
-GitHub の画面から HTML を直接アップロードした場合も、Actions の `build` が自動生成ブロックと一覧を作るので、一覧に載ります。
+GitHub の画面から HTML を直接アップロードした場合も、Actions の `build` が自動生成ブロックと一覧を入れて公開するので、一覧に載ります。
 
 ## 各コマンドの詳細
 
@@ -191,7 +184,7 @@ GitHub の画面から HTML を直接アップロードした場合も、Actions
 | 直す | `<!DOCTYPE html>`・charset・viewport の欠落 |
 | 直す | フッターの「← 一覧に戻る」リンク（`--backlink` のとき。無ければ追加） |
 | 直す | `memo:head` ブロック（アイコン・OGP）の追加／更新 |
-| 直す | 廃止した確認クイズの名残（`memo:quiz` ブロックと `id="memo-quiz"` の問題データ）の削除 |
+| 直す | 原本に入っている `memo:head` ブロックの削除（古い形のページや、公開ページからコピーした HTML。ブロックは `build` が `dist/` にだけ入れる）と、廃止した確認クイズの名残（`memo:quiz` ブロックと `id="memo-quiz"` の問題データ）の削除 |
 | 報告 | JS 内で全角クォートが文字列の区切りに使われている疑い |
 | 報告 | タイトル・説明・タグ・日付の欠落 |
 | 報告 | 一覧へのリンクが無い（`--backlink` を付けていないとき） |
@@ -200,58 +193,60 @@ GitHub の画面から HTML を直接アップロードした場合も、Actions
 
 ### meta
 
-指定した項目だけを書き換え、最後に自動生成ブロックを作り直します（OGP のタイトル・説明が新しいメタ情報に追従します）。
+指定した項目だけを書き換えます。OGP のタイトル・説明は、次の `build` で `dist/` のページに反映されます。
 
 - `--tags` はカンマ区切りで渡し、前後の空白を整えて保存します。
 - `--date` は値を付ければその日付（`YYYY-MM-DD`。形式やありえない日付はエラー）、値なしなら**設定のタイムゾーン（`utc_offset_hours`）の今日**です（[日付と URL の決まり方](#日付と-url-の決まり方)）。
 
 ### build
 
-`build` は次の順に処理します。どれも「内容が変わったときだけ」書き込みます。
+`build` は `src/` を読むだけで書き換えず、`dist/` に置くべきファイルをすべて組み立ててから、`dist/` をその中身にそろえます（変わったファイルだけ書き、要らなくなったファイルは消す）。
 
 ```mermaid
 flowchart TB
-  s1["① 各メモの自動生成ブロックを最新にする<br/>memo:head（アイコン・OGP・アクセント色）。廃止したクイズの名残は取り除く"]
-  s2["② 全メモの &lt;head&gt; を読んで一覧を作る<br/>日付の新しい順"]
-  s3["③ docs/memos.json を書く"]
-  s4["④ index.html のサイト名などと memo:head を最新にする"]
-  s5["⑤ docs/md/*.md と docs/llms.txt を書く<br/>消えたメモの Markdown 版は削除"]
-  s6["⑥ entry-skill/SKILL.md を書く"]
+  s1["① src/ のページ以外のファイルをコピーする<br/>assets/・CNAME・.nojekyll など"]
+  s2["② 各ページに自動生成ブロックを入れる<br/>メモ: memo:head（旧クイズは取り除く）/ index・roadmap: memo:head とサイト名など<br/>オプションのページ（roadmap）はオンのときだけ"]
+  s3["③ 全メモの &lt;head&gt; から memos.json を作る<br/>日付の新しい順"]
+  s4["④ md/*.md と llms.txt を作る"]
+  s5["⑤ entry-skill/SKILL.md を作る"]
+  s6["⑥ dist/ をこの中身にそろえる<br/>消えたメモ・ファイルは dist/ からも消す"]
   s1 --> s2 --> s3 --> s4 --> s5 --> s6
 ```
 
 - `memo.config.json` の `repository` が空・`owner/name` の形でない・テンプレートの値（`repo/sample`）のままのときは、最初に警告を出します（止めずに続けます）。入口スキルの clone 先や公開 URL がおかしくなるのを防ぐためです。
-- `--check` は何も書き込まず、古いファイルがあれば名前を表示して終了コード 1 を返します。
+- `--check` は何も書き込まず、`dist/` に古い（足りない・余分な）ファイルがあれば名前を表示して終了コード 1 を返します。
+- `dist/` を消して `build` し直しても同じ中身になります。`dist/` は `.gitignore` 済みで、コミットするのは `src/` の原本だけです。
 
 ### list / path / url
 
 - `list` は `日付  ファイル名  タイトル  [タグ]` の形で全メモを表示します。
-- `path NAME` は `docs/NAME.html` の絶対パス、`--md` を付けると `docs/md/NAME.md` のパスを表示します。
+- `path NAME` は `src/NAME.html` の絶対パス、`--md` を付けると `dist/md/NAME.md` のパスを表示します（`build` してから読む）。
 - `url NAME` は公開 URL を表示します（名前なしならトップ）。
 
 ### preview
 
-トップページは一覧データ（`memos.json`）を読み込むので、HTML 1 枚だけを渡す場面（会話内のプレビューなど）では一覧が出ません。`preview` は自動生成ブロックを最新にし、トップページならデータを埋め込んだコピーを書き出します。元のファイルは変更しません。
+トップページとロードマップは一覧データ（`memos.json`）を読み込むので、HTML 1 枚だけを渡す場面（会話内のプレビューなど）では一覧が出ません。`preview` は自動生成ブロックを入れ、トップページ・ロードマップならデータを埋め込んだコピーを書き出します。元のファイルは変更しません。
 
 ```mermaid
 flowchart LR
-  in["メモ名・index<br/>または下書きの HTML"] --> g["自動生成ブロックを最新にする"]
-  g --> d{"index？"}
+  in["メモ名・index・roadmap<br/>または下書きの HTML"] --> g["自動生成ブロックを最新にする"]
+  g --> d{"index / roadmap？"}
   d -- はい --> e["window.MEMO_DATA に<br/>memos.json の中身を埋め込む"]
   d -- いいえ --> o
   e --> o["-o の場所に書き出す<br/>（省略時は一時フォルダの memo-preview/）"]
 ```
 
-トップページは、`window.MEMO_DATA` があればそれを使い、無ければ `memos.json` を fetch します。
+トップページとロードマップは、`window.MEMO_DATA` があればそれを使い、無ければ `memos.json` を fetch します。
 
 ## 自動生成ブロック
 
-各ページに差し込まれるブロックです。開始と終了のコメントで囲まれていて、毎回まるごと作り直されるので、中を手で編集しても消えます。
+`build`（と `preview`）が `dist/` のページに差し込むブロックです。原本（`src/`）には入れません。開始と終了のコメントで囲まれていて、毎回まるごと作り直されるので、中を手で編集しても消えます。
 
 | ブロック | 入る場所 | 中身 | 作るもの |
 | --- | --- | --- | --- |
-| `<!-- memo:head -->` 〜 `<!-- /memo:head -->` | `</head>` の直前 | ファビコン・iOS アイコン・OGP（`og:title` / `og:description` は title / description から）、アクセント色（`branding.accent`・`accent_light`） | `lint`・`meta`・`build`・`preview` |
-| `data-memo-site` の付いた要素・属性 | `index.html` の書いた場所 | `memo.config.json` の値（[サイトごとの設定](#サイトごとの設定memoconfigjson)）。目印の属性は残る | `build`・`preview` |
+| `<!-- memo:head -->` 〜 `<!-- /memo:head -->` | `</head>` の直前 | ファビコン・iOS アイコン・OGP（`og:title` / `og:description` は title / description から）、アクセント色（`branding.accent`・`accent_light`） | `build`・`preview`（原本に入っていたら `lint --fix` が取り除く） |
+| `data-memo-site` の付いた要素・属性 | `index.html`・`roadmap.html` の書いた場所 | `memo.config.json` の値（[サイトごとの設定](#サイトごとの設定memoconfigjson)）。目印の属性は残る | `build`・`preview` |
+| `data-memo-if` の付いた要素 | `index.html` の書いた場所 | 設定の項目（`roadmap`）がオフなら要素ごと取り除く。オンならそのまま | `build`・`preview` |
 | `<footer id="memo-backlink">` | `</body>` の直前 | 「← 一覧に戻る」リンク。スタイルはインラインで完結 | `lint --backlink`（無いときだけ追加） |
 
 ## AI 向けの Markdown 版
@@ -260,8 +255,8 @@ flowchart LR
 
 | 出力 | 中身 |
 | --- | --- |
-| `docs/llms.txt` | 全メモの目次。タイトル・説明・タグ・日付と、各 Markdown 版へのリンク |
-| `docs/md/NAME.md` | 冒頭にタイトル・説明・URL・タグ・日付、続けて本文 |
+| `dist/llms.txt` | 全メモの目次。タイトル・説明・タグ・日付と、各 Markdown 版へのリンク |
+| `dist/md/NAME.md` | 冒頭にタイトル・説明・URL・タグ・日付、続けて本文 |
 
 変換のルール:
 
@@ -275,16 +270,18 @@ flowchart LR
 
 ## サイトごとの設定（memo.config.json）
 
-サイトごとに変わる値は、リポジトリ直下の `memo.config.json` に 1 か所だけ書きます。コード・スキル・ページはここから読むので、別のリポジトリで使うときもこのファイルと `docs/CNAME` を変えれば済みます。
+サイトごとに変わる値は、リポジトリ直下の `memo.config.json` に 1 か所だけ書きます。コード・スキル・ページはここから読むので、別のリポジトリで使うときもこのファイルと `src/CNAME` を変えれば済みます。
 
 | 項目 | 使われる場所 | 既定値 |
 | --- | --- | --- |
 | `site_name` | 各ページの OGP・iOS アイコン名、トップページの `<title>`・見出し、`llms.txt` の見出し、入口スキルの説明、アイコン・OGP 画像の文字 | `MEMO` |
 | `description` | トップページの説明（本文と `<meta name="description">`、OGP）、OGP 画像の説明文 | 空 |
 | `llms_description` | `llms.txt` の冒頭の説明（空なら書かない） | 空 |
-| `repository` | トップページのリンク、`docs/CNAME` が無いときの公開 URL、入口スキル（clone 先・スキル名） | 空（`build` が警告） |
+| `repository` | トップページのリンク、`src/CNAME` が無いときの公開 URL、入口スキル（clone 先・スキル名） | 空（`build` が警告） |
 | `branch` | スキルの push 先（`python3 scripts/memo.py config branch` で読む）、入口スキルの raw URL | `main` |
+| `deploy_branch` | `build` の出力（`dist/`）をデプロイするブランチ。GitHub Pages の公開元にする。`branch` と同じにはできない | `dist` |
 | `utc_offset_hours` | `meta --date` の「今日」 | `0`（日本なら `9`） |
+| `roadmap` | ロードマップ（`src/roadmap.html`）を公開して、トップページからリンクするか（`true` / `false`。[ロードマップ（オプション）](#ロードマップオプション)） | `false` |
 | `branding` | 全ページのアクセント色（`memo:head` に入る）と、アイコン・OGP 画像（`branding/render.py`）。下の表 | `{}` |
 
 `branding` の中の項目（空欄はほかの設定から埋まります）:
@@ -299,15 +296,15 @@ flowchart LR
 | `accent_light` | ライトモードのページの `--accent` と、`theme: light` の画像の色 | `accent` を白地とのコントラスト比 4.5 以上になるまで暗くした色 |
 | `theme` | 画像のテーマ。`dark` か `light`（ページはライト・ダークの両方に自動で対応） | `dark` |
 
-- 書き間違い（JSON の書式、文字列であるべき項目に数値、`site_name`・`branch` が空、`utc_offset_hours` が -24〜24 の外など）は、項目名と直し方を示して止まります（traceback は出しません）。
+- 書き間違い（JSON の書式、文字列であるべき項目に数値、`roadmap` が true / false でない、`site_name`・`branch` が空、`deploy_branch` が `branch` と同じ、`utc_offset_hours` が -24〜24 の外など）は、項目名と直し方を示して止まります（traceback は出しません）。
 - 書かなかった項目は既定値（`scripts/memolib/config.py` の `DEFAULTS`・`BRANDING_DEFAULTS`）になります。知らない項目や、`accent`・`accent_light`・`theme` のおかしな値があるとエラーで止まります（綴りの間違いに気づけるように）。
 - アクセント色は `build` が全ページの `memo:head` に `<style id="memo-accent">` として入れます。各ページの `:root` の `--accent` より強い `html:root` で書くので、ページ側の値（テンプレートの既定値）は上書きされます。
 - `branding` を変えても `build` だけでは画像は変わりません。`python3 branding/render.py` で作り直します（[日付と URL の決まり方](#日付と-url-の決まり方) の「URL」）。
 - `python3 scripts/memo.py config` で今の設定（と公開 URL）を表示できます。
 
-**トップページへの差し込み**
+**トップ・ロードマップのページへの差し込み**
 
-`docs/index.html` のサイト名などは手で書かず、目印の属性を付けておくと `build` が設定の値で書き換えます。書式の中では `{site_name}`・`{description}`・`{repository}` が使えます。
+`src/index.html`・`src/roadmap.html` のサイト名などは手で書かず、目印の属性を付けておくと `build` が設定の値で書き換えます。書式の中では `{site_name}`・`{description}`・`{repository}` が使えます。
 
 ```html
 <h1 data-memo-site="{site_name}">MEMO</h1>                       <!-- 中身のテキストを置き換える -->
@@ -319,9 +316,23 @@ flowchart LR
 
 **アプリ側の入口スキル**
 
-claude.ai のアプリに置く入口スキルは「このリポジトリを取ってきて、ここのスキルに従う」だけのものです。リポジトリ名とブランチだけはアプリ側で知っている必要があるので、`build` が設定から `entry-skill/SKILL.md` を作ります。設定を変えたら、これをアプリ側のスキルに貼り直します。
+claude.ai のアプリに置く入口スキルは「このリポジトリを取ってきて、ここのスキルに従う」だけのものです。リポジトリ名とブランチだけはアプリ側で知っている必要があるので、`build` が設定から `dist/entry-skill/SKILL.md` を作ります（dist ブランチと公開サイトの `/entry-skill/SKILL.md` にも置かれます）。設定を変えたら、これをアプリ側のスキルに貼り直します。
 
 スキル名はリポジトリ名から作ります。スキル名に使えるのは小文字・数字・ハイフンだけなので、大文字は小文字に、それ以外の文字（`.` `_` など）はハイフンにします（`Alice/My.Notes` → `my-notes`、`alice/alice.github.io` → `alice-github-io`。64 文字まで）。clone 先のフォルダ名はリポジトリ名のままです。
+
+### ロードマップ（オプション）
+
+`src/roadmap.html` は、書いたメモとこれから書くテーマを分野ごとに並べたチェックリストです。必ず要るものではないので、既定ではオフです。`memo.config.json` に `"roadmap": true` を書いて `build` すると公開され、トップページのフッターに「ロードマップ」のリンクが出ます。
+
+- 項目はページのスクリプト冒頭の `ROADMAP` に書きます。書いたメモは `file` だけ、これから書くテーマは `title`・`prio`（`high` / `mid` / `low`）・`note` も書きます。別の名前でも済みにしたいときは `alt` にファイル名を並べます。
+- チェックは手で付けません。ページが `memos.json` を読み、項目の `file` か `alt` があれば済みにします。どの項目にも当てはまらないメモは「ロードマップ外のメモ」に並びます。
+- オフのときは、`build` が `dist/` に `roadmap.html` を出さず、ほかのページの `data-memo-if="roadmap"` の付いた要素（トップページのリンク）を取り除きます。オンなら何もしません。
+
+```html
+<span data-memo-if="roadmap">· <a href="roadmap.html">ロードマップ</a></span>  <!-- roadmap が false なら要素ごと消える -->
+```
+
+使える項目は `scripts/memolib/config.py` の `OPTIONAL_PAGES`（ページ名と設定の項目の対応）の値だけです。中に同じ名前のタグを入れ子にしないでください（最初の閉じタグまでを 1 つの要素とみなします）。
 
 ## 日付と URL の決まり方
 
@@ -339,21 +350,21 @@ flowchart LR
 
 **URL**
 
-- 公開 URL は `docs/CNAME` の独自ドメインから決まります（無ければ `memo.config.json` の `repository` から GitHub Pages の URL `https://OWNER.github.io/REPO/` を作ります）。`og:url`・`og:image` の絶対 URL にも使います。
+- 公開 URL は `src/CNAME` の独自ドメインから決まります（無ければ `memo.config.json` の `repository` から GitHub Pages の URL `https://OWNER.github.io/REPO/` を作ります）。`og:url`・`og:image` の絶対 URL にも使います。
 - `og:image` には `og.png` の中身から作った短いハッシュ（`?v=…`）を付けます。画像を差し替えると URL が変わり、SNS 側の画像キャッシュが古いまま残るのを防げます。
-- アイコンと OGP 画像の生成元は `branding/`（`og.html`・`icon.html`・`leaf.css`）で、`python3 branding/render.py` で `docs/assets/` に書き出します（`branding/` は公開されません）。文字と色は `memo.config.json`（`site_name`・`description`・公開 URL と `branding`）から差し込むので、HTML を直接書き換える必要はありません。
-- `render.py` だけは標準ライブラリでは動きません（playwright と chromium、Pillow、フォント Noto Sans CJK JP / DejaVu Sans Mono が必要。README の「必要なもの」）。Actions では動かさないので、設定を変えたら手元で実行し、できた画像をコミットします。`og.png` が変わると、次の `build` で `og:image` の `?v=` が更新されます。
+- アイコンと OGP 画像の生成元は `branding/`（`og.html`・`icon.html`・`leaf.css`）で、`python3 branding/render.py` で `src/assets/` に書き出します（`branding/` は公開されません）。文字と色は `memo.config.json`（`site_name`・`description`・公開 URL と `branding`）から差し込むので、HTML を直接書き換える必要はありません。
+- `render.py` だけは標準ライブラリでは動きません（playwright と chromium、Pillow、フォント Noto Sans CJK JP / DejaVu Sans Mono が必要。README の「必要なもの」）。Actions では動かさないので、設定を変えたら手元で実行し、できた画像をコミットします。`og.png` が変わると、次の `build`（デプロイ）で `og:image` の `?v=` が更新されます。
 
 ## 表示の確認とプレビュー
 
-各メモは 1 枚で完結していますが、トップページは `memos.json` を読み込むので、開き方によって表示が変わります。
+各メモは 1 枚で完結していますが、トップページとロードマップは `memos.json` を読み込むので、開き方によって表示が変わります。アイコン・OGP・アクセント色は `build` が `dist/` のページにだけ入れます。
 
 | 開き方 | 各メモ | トップの一覧 |
 | --- | --- | --- |
 | 公開サイト（GitHub Pages） | 出る | 出る |
-| ローカルサーバー `python3 -m http.server -d docs` | 出る | 出る |
+| `build` してからローカルサーバー `python3 -m http.server -d dist` | 出る | 出る |
 | `memo.py preview` で作った 1 枚 | 出る | 出る |
-| HTML ファイルを直接開く・そのまま会話に送る | 出る（自動生成ブロックが古い場合はそのまま） | 「読み込めませんでした」と表示 |
+| 原本（`src/`）の HTML を直接開く・そのまま会話に送る | 出る（アクセント色はテンプレートの既定値） | 「読み込めませんでした」と表示 |
 
 会話内で下書きを見せるときの手順は [memo-style の「会話内でプレビューするとき」](.claude/skills/memo-style/SKILL.md) にあります。
 
@@ -364,19 +375,25 @@ python3 scripts/memo.py preview 下書き.html -o /tmp/NAME.html
 
 ## GitHub Actions
 
-`.github/workflows/build-index.yml` が、デフォルトブランチへの push で生成物を作り直します（ブランチ名はワークフローに書いていないので、`main` でも `master` でも動きます）。
+`.github/workflows/deploy.yml`（`Deploy MEMO`）が、デフォルトブランチへの push で `build` して、`dist/` の中身を dist ブランチにコミットします（ブランチ名はワークフローに書いていないので、`main` でも `master` でも動きます。デプロイ先は `memo.config.json` の `deploy_branch`）。GitHub Pages の公開元は dist ブランチ（`/`（root））にします。
+
+```mermaid
+flowchart LR
+  push["master に push<br/>（原本だけ）"] --> b["Deploy MEMO<br/>lint（報告のみ）→ build"]
+  b --> d["dist/"]
+  d -->|"中身を丸ごと置き換えてコミット"| br["dist ブランチ"]
+  br --> pages["GitHub Pages"]
+```
 
 | 項目 | 内容 |
 | --- | --- |
-| 起動する変更 | `docs/*.html`・`docs/CNAME`・`scripts/` 以下・`docs/assets/og.png`・`memo.config.json`（手動実行も可） |
+| 起動する変更 | `src/` 以下・`scripts/` 以下・`memo.config.json`・このワークフロー（手動実行も可） |
 | 手順 | 履歴ごと checkout（日付の推定に使う）→ 全メモを `lint`（報告のみ。メモが 0 本なら省略）→ `build` |
-| コミット | `docs/`・`entry-skill/` に変更（新しく生成されたファイルを含む）があれば `Rebuild MEMO index` としてコミット・push |
-| 同時実行 | 同じブランチの実行は 1 本ずつ順番に動く（`concurrency`。途中で止めない） |
-| push の競合 | build 中に別の push が来てこちらの push が拒否されたら、最新を取り込んで `build` し直し、もう一度 push する（最大 3 回。それでもだめなら失敗にする） |
+| コミット | dist ブランチを `dist/` の中身で丸ごと置き換え、変わっていれば `Deploy <元のコミット>` としてコミット・push。dist ブランチの履歴は残るので、生成物の変化も追える。ブランチがまだなければ履歴のない（orphan）ブランチとして作る |
+| 原本のブランチ | 何もコミットしない（以前の `Rebuild MEMO index` のような Actions のコミットは入らない） |
+| 同時実行 | 同じブランチの実行は 1 本ずつ順番に動く（`concurrency`。途中で止めない）。dist ブランチに書くのはこのワークフローだけなので、push の競合は起きない |
 
-ローカルで `build` してから push していれば、Actions 側では差分が出ません。
-
-もう 1 つの `.github/workflows/test.yml`（`Test memo.py`）は、`scripts/`・`tests/`・トップページ・`memo.config.json`・テンプレートが変わったとき（どのブランチでも、PR も含む）にテストを流します。リポジトリは書き換えません。
+もう 1 つの `.github/workflows/test.yml`（`Test memo.py`）は、`scripts/`・`tests/`・トップ・ロードマップのページ・`memo.config.json`・テンプレートが変わったとき（どのブランチでも、PR も含む）にテストを流します。リポジトリは書き換えません。
 
 ## コードの構成とテスト
 
@@ -395,8 +412,10 @@ flowchart LR
     lint["lint.py<br/>崩れチェック"]
     md["markdown.py<br/>Markdown 版"]
     site["site.py<br/>memos.json<br/>preview"]
+    dist["dist.py<br/>dist/ を組み立てて書き出す"]
   end
-  cli --> lint & md & site & meta & blocks & config & entry
+  cli --> dist & lint & site & meta & config
+  dist --> entry & md & site & blocks & meta & config
   entry --> config
   lint --> blocks
   md --> blocks
@@ -408,18 +427,19 @@ flowchart LR
   meta --> config
 ```
 
-矢印は「使っている」向きです。依存は一方向（`config` ← `meta` ← `blocks` ← `lint`・`markdown`・`site` ← `memo.py`、`config` ← `entry` ← `memo.py`）で、逆向きの import はありません。
+矢印は「使っている」向きです。依存は一方向（`config` ← `meta` ← `blocks` ← `lint`・`markdown`・`site` ← `dist` ← `memo.py`、`config` ← `entry` ← `dist`）で、逆向きの import はありません。
 
 | ファイル | 役割 | 主な関数 |
 | --- | --- | --- |
 | `scripts/memo.py` | コマンドの受け付け | `cmd_build`・`cmd_lint`・`cmd_preview` など、`main` |
 | `memolib/config.py` | 置き場所・`memo.config.json` の読み込み・公開 URL・日付・自動生成ブロックの目印 | `load_config`・`today`・`site_url`・`pages_url`・`asset_version` |
 | `memolib/meta.py` | `<head>` のメタ情報の読み書き、名前からパスへの解決 | `read_meta`・`set_meta`・`memo_path`・`memo_files` |
-| `memolib/blocks.py` | 自動生成ブロック、サイト設定の差し込み、「一覧に戻る」フッター、廃止したクイズの片付け | `head_block`・`apply_site`・`apply_generated`・`strip_quiz` |
+| `memolib/blocks.py` | 自動生成ブロック、サイト設定の差し込み、「一覧に戻る」フッター、廃止したクイズの片付け | `head_block`・`apply_site`・`apply_generated`・`strip_generated` |
 | `memolib/entry.py` | アプリ側の入口スキルの中身 | `entry_skill` |
 | `memolib/lint.py` | 崩れのチェックと自動修正 | `lint_text` |
-| `memolib/markdown.py` | AI 向けの Markdown 版 | `html_to_markdown`・`memo_markdown`・`llms_txt`・`build_markdown` |
+| `memolib/markdown.py` | AI 向けの Markdown 版 | `html_to_markdown`・`memo_markdown`・`llms_txt`・`markdown_outputs` |
 | `memolib/site.py` | 一覧の JSON、会話内プレビュー用の 1 枚の HTML | `site_data`・`memos_json`・`preview_text` |
+| `memolib/dist.py` | `dist/` に置く全ファイルを組み立てて書き出す（`src/` のコピー＋生成物。消えたファイルは消す） | `dist_outputs`・`sync_dist` |
 
 多くの関数は「HTML の文字列を受け取って文字列を返す」だけで、ファイルを書き換えるのは `memo.py` の各コマンドです。そのため関数単位でテストできます。
 
@@ -427,7 +447,7 @@ flowchart LR
 
 標準ライブラリの `unittest` だけで動きます。一時フォルダに作った「作業用リポジトリ」で動かすので、リポジトリ自体は書き換えません。
 
-ほとんどのテストは、仕組みのファイル（`scripts/`・テンプレート・`docs/` の `index.html`・`assets/`）に `tests/fixtures/` のサンプルのメモ 2 本と設定を組み合わせて動きます。本物のメモが 1 本もない（仕組みだけを取り出した）リポジトリでも通ります。本物のメモを確かめるテスト（コミット済みの生成物が最新か、全メモが lint を通るか）は、メモがあるときだけ動きます。
+ほとんどのテストは、仕組みのファイル（`scripts/`・テンプレート・`src/` の `index.html`・`roadmap.html`・`.nojekyll`・`assets/`）に `tests/fixtures/` のサンプルのメモ 2 本と設定を組み合わせて動きます。本物のメモが 1 本もない（仕組みだけを取り出した）リポジトリでも通ります。本物のメモを確かめるテスト（原本に自動生成ブロックや生成物が混ざっていないか、`build` で `src/` が変わらないか、全メモが lint を通るか）は、メモがあるときだけ動きます。
 
 ```bash
 python3 -B -m unittest discover -s tests       # 全部（15 秒ほど）
@@ -440,24 +460,25 @@ python3 -B tests/snapshot.py OUTDIR            # 全コマンドの出力を保�
 | `tests/test_units.py` | 関数ごとの単体テスト。設定の読み込みとタイムゾーンの日付、サイト設定の差し込み、ブロックの差し込み位置と冪等性、廃止したクイズの片付け、CSS の化けの修正、Markdown 変換など |
 | `tests/snapshot.py` | テストではなく道具。全メモの `build`・`lint`・`preview` と各コマンドの出力をフォルダに保存する。リファクタリングの前後で 1 回ずつ実行し、`diff -r` で何も出なければ出力は変わっていない |
 | `tests/helpers.py` | 「作業用リポジトリ」を作る共通処理（`Workspace()` はサンプル、`Workspace(real=True)` は本物のメモ） |
-| `tests/fixtures/` | テスト用のサンプルのメモ（`docs/`）と設定（`memo.config.json`） |
+| `tests/fixtures/` | テスト用のサンプルのメモ（`src/`）と設定（`memo.config.json`） |
 
 ## 変更したいときはどこを触るか
 
 | 変えたいもの | 触るファイル | その後 |
 | --- | --- | --- |
-| メモの本文 | `docs/NAME.html` | `lint NAME` → `build` |
+| メモの本文 | `src/NAME.html` | `lint NAME` → `build` |
 | タイトル・説明・タグ・日付 | `meta NAME ...` | `build` |
 | アイコン・OGP のタグ | `memolib/blocks.py` の `head_block` | `build`（全ページが書き換わる） |
 | サイトのアクセント色 | `memo.config.json` の `branding.accent`・`accent_light` | `python3 branding/render.py` → `build`（全ページが書き換わる） |
 | アイコン・OGP 画像の文字・色 | `memo.config.json`（`site_name`・`description`・`branding`） | `python3 branding/render.py` → `build` |
 | アイコン・OGP 画像のデザイン | `branding/`（`og.html`・`icon.html`・`leaf.css`、テーマの色は `render.py` の `THEMES`） | `python3 branding/render.py` → `build` |
-| トップページの見た目 | `docs/index.html` | 何もしなくてよい（サイト名などを入れる場所を増やしたら `build`） |
+| トップページ・ロードマップの見た目 | `src/index.html`・`src/roadmap.html` | 何もしなくてよい（サイト名などを入れる場所を増やしたら `build`） |
 | サイト名・説明・リポジトリ・ブランチ・タイムゾーン | `memo.config.json` | `build`（全ページ・入口スキルが書き換わる。入口スキルはアプリ側にも貼り直す） |
 | 一覧に載せる項目 | `memolib/meta.py` の `read_meta`、`memolib/site.py` の `memos_json` | `build` |
 | Markdown 版の変換ルール | `memolib/markdown.py` の `_ToMarkdown`・`html_to_markdown` | `build`（全 Markdown 版が書き換わる） |
 | 新しいメモの雛形 | `.claude/skills/memo-style/template.html` | 何もしなくてよい |
-| 公開ドメイン | `docs/CNAME` | `build`（OGP の URL が変わる） |
+| ロードマップの項目 | `src/roadmap.html` の `ROADMAP` | 何もしなくてよい（`roadmap` が `true` なら push で公開） |
+| 公開ドメイン | `src/CNAME` | `build`（OGP の URL が変わる） |
 | 上の表にないスクリプトの処理 | `scripts/memolib/` の該当モジュール（[コードの構成とテスト](#コードの構成とテスト)） | [memo-maintain](.claude/skills/memo-maintain/SKILL.md) の手順でテストと前後比較 |
 
 
@@ -472,7 +493,7 @@ python3 -B tests/snapshot.py OUTDIR            # 全コマンドの出力を保�
 | `scripts/`・`tests/`（`tests/fixtures/` を含む） | `memo.py` とテスト |
 | `.claude/skills/` | スキルとメモの雛形 |
 | `.github/workflows/` | 生成とテストのワークフロー |
-| `docs/index.html`・`docs/assets/` | トップページ、アイコン |
+| `src/index.html`・`src/roadmap.html`・`src/.nojekyll`・`src/assets/` | トップページ、ロードマップ（オプション）、アイコン |
 | `branding/` | アイコンと OGP 画像の生成元 |
 | `memo.config.json`・`README.md`・`memo-detail.md`・`LICENSE`・`.gitignore` | 設定・説明・ライセンス |
 
@@ -480,20 +501,20 @@ python3 -B tests/snapshot.py OUTDIR            # 全コマンドの出力を保�
 
 | 場所 | 中身 |
 | --- | --- |
-| `docs/` 直下の上記以外の `*.html` | サンプルのメモ（`sample.html`・`sample-plain.html`） |
-| `docs/md/`・`docs/memos.json`・`docs/llms.txt`・`entry-skill/` | 生成物（`build` で作り直す） |
+| `src/` 直下の上記以外の `*.html` | サンプルのメモ（`sample.html`・`sample-plain.html`） |
+| `dist/` | 生成物（`build` で作り直す。コミットされない） |
 
 **手順**
 
 ```bash
 # 1. サンプルのメモと生成物を消す
-find docs -maxdepth 1 -name '*.html' ! -name index.html -delete
-rm -rf docs/md docs/memos.json docs/llms.txt entry-skill
-# 2. memo.config.json の site_name・description・llms_description・repository・branch・utc_offset_hours・branding を自分のリポジトリに合わせる
+find src -maxdepth 1 -name '*.html' ! -name index.html ! -name roadmap.html -delete
+rm -rf dist
+# 2. memo.config.json の site_name・description・llms_description・repository・branch・deploy_branch・utc_offset_hours・roadmap・branding を自分のリポジトリに合わせる
 # 3. 作り直して確かめる
 python3 branding/render.py                 # アイコン・OGP 画像を設定から作り直す（要: playwright など）
 python3 scripts/memo.py build              # repository を書き換え忘れていると警告が出る
 python3 -B -m unittest discover -s tests   # 本物のメモを見るテストは飛ばされる
 ```
 
-あとは GitHub の設定（Pages の公開元・Actions の書き込み権限）を README の「はじめかた」のとおりにし、`entry-skill/SKILL.md` をアプリ側のスキルとして登録すれば、アプリからも使えます。
+あとは GitHub の設定（Pages の公開元・Actions の書き込み権限）を README の「はじめかた」のとおりにし、`dist/entry-skill/SKILL.md` をアプリ側のスキルとして登録すれば、アプリからも使えます。

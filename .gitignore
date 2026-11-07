@@ -1,1 +1,3 @@
 __pycache__/
+# build の出力（公開するサイト一式）。Actions が dist ブランチにデプロイする
+/dist/

@@ -92,7 +92,7 @@ python3 scripts/memo.py path NAME     # 実ファイルのパス
 
 ```bash
 python3 scripts/memo.py lint NAME      # OK になること
-python3 scripts/memo.py build
+python3 scripts/memo.py build          # dist/ で崩れがないか確かめる（コミットするのは src/ の原本だけ）
 BRANCH="$(python3 scripts/memo.py config branch)"   # push 先（memo.config.json）
 git fetch origin "$BRANCH"              # 遅れていれば rebase
 git add -A "$(dirname "$(python3 scripts/memo.py path NAME)")"

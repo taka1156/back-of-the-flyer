@@ -8,7 +8,8 @@ on:
     paths:
       - "scripts/**"
       - "tests/**"
-      - "docs/index.html"
+      - "src/index.html"
+      - "src/roadmap.html"
       - "memo.config.json"
       - ".claude/skills/memo-style/template.html"
       - ".github/workflows/test.yml"
@@ -16,7 +17,8 @@ on:
     paths:
       - "scripts/**"
       - "tests/**"
-      - "docs/index.html"
+      - "src/index.html"
+      - "src/roadmap.html"
       - "memo.config.json"
       - ".claude/skills/memo-style/template.html"
       - ".github/workflows/test.yml"

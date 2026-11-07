@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import re
 
-from .blocks import BACKLINK, BACKLINK_ID, apply_head, strip_quiz
+from .blocks import BACKLINK, BACKLINK_ID, strip_generated
 
 CURLY = "‘’“”"
 
@@ -29,7 +29,7 @@ def _fix_css(css: str) -> tuple[str, list[str]]:
     return css, notes
 
 
-def lint_text(text: str, backlink: bool, filename: str = "") -> tuple[str, list[str], list[str]]:
+def lint_text(text: str, backlink: bool) -> tuple[str, list[str], list[str]]:
     """returns (fixed_text, fixed_notes, problems_remaining)"""
     fixed: list[str] = []
     problems: list[str] = []
@@ -86,14 +86,11 @@ def lint_text(text: str, backlink: bool, filename: str = "") -> tuple[str, list[
     elif BACKLINK_ID not in text and "index.html" not in text:
         problems.append("一覧（index.html）へのリンクがない（--backlink で追加）")
 
-    if filename:
-        new = apply_head(text, filename)
-        if new != text:
-            fixed.append("アイコン・OGP の head タグを追加／更新")
-            text = new
-        new = strip_quiz(text)
-        if new != text:
-            fixed.append("廃止したクイズの表示ブロックと問題データを削除")
-            text = new
+    # 自動生成ブロックは build が dist/ のページにだけ入れる。原本に入っていたら（古い形のページや
+    # 公開ページからコピーした HTML）取り除く。廃止したクイズの表示ブロックと問題データも取り除く
+    new = strip_generated(text)
+    if new != text:
+        fixed.append("自動生成ブロック（memo:head）と旧クイズを原本から削除（build が dist/ に head を入れる）")
+        text = new
 
     return text, fixed, problems

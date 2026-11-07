@@ -36,7 +36,7 @@ python3 scripts/memo.py new NAME   # NAME は英小文字・ハイフン（例: 
 | `--accent` | `#0077b6` ※ | `#00d4ff` ※ | 見出し・強調・リンク |
 | `--chip` | `#eceff4` | `#18222f` | タグ・ボタン背景 |
 
-※ `--accent` はサイトの設定（`memo.config.json` の `branding.accent_light`・`branding.accent`）で決まり、`build` が自動生成ブロック（`memo:head`）でページの値を上書きする。ページには表の値を書いておけばよく、色を自分で変えない。アクセント色が要る箇所は必ず `var(--accent)` を使い、色の値を直接書かない（`rgba()` で薄めたいときは `color-mix(in srgb, var(--accent) 20%, transparent)`）。
+※ `--accent` はサイトの設定（`memo.config.json` の `branding.accent_light`・`branding.accent`）で決まり、`build` が `dist/` に書き出すページで自動生成ブロック（`memo:head`）が値を上書きする。ページには表の値を書いておけばよく、色を自分で変えない。アクセント色が要る箇所は必ず `var(--accent)` を使い、色の値を直接書かない（`rgba()` で薄めたいときは `color-mix(in srgb, var(--accent) 20%, transparent)`）。
 
 図の中で色分けが必要なときは、意味ごとに追加変数を定義する（例: `--c-ok`, `--c-warn`）。色だけで意味を伝えず、ラベルも付ける。
 
@@ -76,7 +76,7 @@ python3 scripts/memo.py new NAME   # NAME は英小文字・ハイフン（例: 
 `preview` で自動生成ブロック（アイコン・OGP・アクセント色）を入れた 1 枚を作って送る（公開版と見た目・動きは変わらない）。下書きのファイルパスにも使える。
 
 ```bash
-python3 scripts/memo.py lint 下書き.html --fix --backlink           # 自動生成ブロックを入れて崩れを直す
+python3 scripts/memo.py lint 下書き.html --fix --backlink           # 崩れを直す（自動生成ブロックは preview・build が入れる）
 python3 scripts/memo.py preview 下書き.html -o <スクラッチパッド>/NAME.html
 ```
 

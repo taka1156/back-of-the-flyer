@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title data-memo-site="{site_name} ロードマップ">MemoKit ロードマップ</title>
+<meta name="description" content="MemoKit にあるメモと、これから埋めたいテーマを分野ごとのチェックリストにしたページ。メモが追加されると自動でチェックが付く" data-memo-site-content="{site_name} にあるメモと、これから埋めたいテーマを分野ごとのチェックリストにしたページ">
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Noto+Sans+JP:wght@400;500;700&display=swap">
+<style>
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --fg: #1c2230;
+  --fg-2: #5a6376;
+  --line: #dde1e8;
+  --accent: #0077b6;
+  --chip: #eceff4;
+  --c-high: #cf222e;
+  --c-mid: #9a6700;
+  --c-low: #5a6376;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0a0e14;
+    --surface: #111823;
+    --fg: #cdd9e5;
+    --fg-2: #7d8b9d;
+    --line: #1e2d3d;
+    --accent: #00d4ff;
+    --chip: #18222f;
+    --c-high: #f85149;
+    --c-mid: #d29922;
+    --c-low: #7d8b9d;
+  }
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: 'Noto Sans JP', system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.7;
+  min-height: 100vh;
+  padding: 48px 16px 64px;
+}
+.wrap { max-width: 720px; margin: 0 auto; }
+header { margin-bottom: 24px; }
+.back { font: 600 0.75rem 'JetBrains Mono', monospace; color: var(--fg-2); text-decoration: none; }
+.back:hover { color: var(--accent); }
+h1 {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 1.6rem;
+  letter-spacing: 0.12em;
+  color: var(--accent);
+  margin-top: 8px;
+}
+.lead { color: var(--fg-2); font-size: 0.85rem; margin-top: 4px; }
+code, .mono { font-family: 'JetBrains Mono', monospace; }
+code { font-size: 0.85em; }
+a { color: var(--accent); }
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 14px;
+}
+.panel h2 { font-size: 1rem; }
+.panel .note { color: var(--fg-2); font-size: 0.8rem; margin: 2px 0 10px; }
+
+/* 進み具合 */
+.panel-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.count { font: 600 0.8rem 'JetBrains Mono', monospace; color: var(--fg-2); white-space: nowrap; }
+.big { font: 700 1.5rem 'JetBrains Mono', monospace; color: var(--accent); }
+.big small { font-size: 0.8rem; color: var(--fg-2); font-weight: 500; }
+.bar { height: 6px; background: var(--chip); border-radius: 999px; overflow: hidden; margin: 8px 0 10px; }
+.bar > span { display: block; height: 100%; background: var(--accent); width: 0; transition: width .4s; }
+.area .bar { height: 4px; margin: 6px 0 8px; }
+.stats { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 0.8rem; color: var(--fg-2); }
+
+/* 絞り込み */
+.filters { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 14px; }
+.filter {
+  border: 1px solid var(--line);
+  background: var(--chip);
+  color: var(--fg-2);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font: 700 0.75rem 'Noto Sans JP', system-ui, sans-serif;
+  cursor: pointer;
+}
+.filter:hover { border-color: var(--accent); color: var(--accent); }
+.filter[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+
+/* チェックリスト */
+.items { list-style: none; }
+.item {
+  display: grid;
+  grid-template-columns: 20px 1fr;
+  gap: 0 10px;
+  padding: 6px 0;
+  border-top: 1px solid var(--line);
+}
+.item:first-child { border-top: none; }
+.box {
+  width: 16px; height: 16px; margin-top: 4px;
+  border: 2px solid var(--line);
+  border-radius: 4px;
+  display: grid; place-items: center;
+  font-size: 11px; line-height: 1; color: var(--bg);
+}
+.item.done .box { background: var(--accent); border-color: var(--accent); }
+.item.done .box::after { content: "✓"; font-weight: 700; }
+.item-main { min-width: 0; }
+.item-title { font-size: 0.9rem; font-weight: 500; overflow-wrap: anywhere; }
+.item.done .item-title a { text-decoration: none; }
+.item.done .item-title a:hover { text-decoration: underline; }
+.item-sub { font-size: 0.75rem; color: var(--fg-2); overflow-wrap: anywhere; }
+.tag {
+  display: inline-block;
+  font: 700 0.65rem 'JetBrains Mono', monospace;
+  padding: 0 7px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  margin-left: 6px;
+  vertical-align: 2px;
+  white-space: nowrap;
+}
+.tag.high { color: var(--c-high); }
+.tag.mid { color: var(--c-mid); }
+.tag.low { color: var(--c-low); }
+.hidden-by-filter, .area.empty-by-filter { display: none; }
+.msg { color: var(--fg-2); font-size: 0.85rem; }
+.err { border-color: var(--c-high); }
+
+details { margin-top: 24px; font-size: 0.82rem; color: var(--fg-2); }
+details summary { cursor: pointer; }
+details ul { margin: 8px 0 0 1.2em; }
+details li + li { margin-top: 4px; }
+details code { background: var(--chip); padding: 1px 5px; border-radius: 4px; color: var(--fg); }
+footer { margin-top: 40px; font-size: 0.75rem; color: var(--fg-2); text-align: center; }
+footer a { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="back" href="index.html">&larr; 一覧に戻る</a>
+    <h1>ROADMAP</h1>
+    <p class="lead">書いたメモと、これから埋めたいテーマのチェックリスト。メモが公開されると自動でチェックが付きます</p>
+  </header>
+
+  <section class="panel">
+    <div class="panel-head"><h2>進み具合</h2><span class="big" id="overall-num">– <small>/ –</small></span></div>
+    <div class="bar"><span id="overall-bar"></span></div>
+    <div class="stats" id="prio-stats"></div>
+  </section>
+
+  <div class="filters" role="group" aria-label="表示の絞り込み">
+    <button class="filter" aria-pressed="true" data-filter="all">すべて</button>
+    <button class="filter" aria-pressed="false" data-filter="todo">未着手</button>
+    <button class="filter" aria-pressed="false" data-filter="high">優先度 高の未着手</button>
+    <button class="filter" aria-pressed="false" data-filter="done">済み</button>
+  </div>
+  <div id="areas"><p class="msg">一覧データを読み込み中…</p></div>
+
+  <section class="panel" id="extra-panel">
+    <h2>ロードマップ外のメモ</h2>
+    <div id="extra-box"><p class="msg">読み込み中…</p></div>
+  </section>
+
+  <details>
+    <summary>チェックの付き方と、項目の足し方</summary>
+    <ul>
+      <li>一覧データ（<code>memos.json</code>）に、項目の <code>file</code> か <code>alt</code>（別名）のファイル名があれば済みになる。手で付けるチェックはない</li>
+      <li>未着手の項目には予定のファイル名を出している。その名前でメモを作れば、公開した時点でチェックが付く。違う名前で作ったら <code>alt</code> に足す</li>
+      <li>項目はこのページのスクリプト冒頭の <code>ROADMAP</code> に書く。<code>prio</code> は <code>high</code> / <code>mid</code> / <code>low</code>、<code>note</code> は理由を 1 行</li>
+      <li>どの項目にも当てはまらないメモは「ロードマップ外のメモ」に自動で並ぶ</li>
+    </ul>
+  </details>
+
+  <footer><a href="index.html" data-memo-site="{site_name} 一覧">MemoKit 一覧</a></footer>
+</div>
+
+<script>
+// ── ロードマップの定義 ─────────────────────────────
+// 書いたメモは file だけでよい（タイトルは memos.json から取る）。
+// 未着手のテーマは title・prio・note を書く。alt は別名でも済みにしたいときのファイル名。
+const ROADMAP = [
+  // 例: サンプルのメモ 2 本と、これから書く予定のテーマ。自分のテーマに書き換える
+  { id: 'basics', name: 'はじめに', note: '分野ごとに 1 つ。書いたメモは file だけ、予定のテーマは title・prio・note も書く', items: [
+    { file: 'vite-plus.html' },
+    { file: 'next-topic.html', title: '次に書くテーマ（例）', prio: 'high',
+      note: 'このファイル名でメモを作って公開すると、自動でチェックが付く', alt: ['next-topic-alt.html'] },
+  ]},
+];
+
+// このページ自身や特別なページは「ロードマップ外」に出さない
+const SELF = (location.pathname.split('/').pop() || 'roadmap.html');
+const IGNORE = new Set(['roadmap.html', SELF, 'index.html']);
+const PRIO_LABEL = { high: '高', mid: '中', low: '低' };
+
+// ── 一覧データの読み込み ───────────────────────────
+// 公開版は memos.json を読む。memo.py preview などで埋め込まれた window.MEMO_DATA があればそれを使う
+async function loadMemos() {
+  if (window.MEMO_DATA && window.MEMO_DATA['memos.json']) return window.MEMO_DATA['memos.json'];
+  const res = await fetch('memos.json', { cache: 'no-cache' });
+  if (!res.ok) throw new Error('memos.json: HTTP ' + res.status);
+  return res.json();
+}
+
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+
+function render(memos) {
+  const byFile = new Map(memos.map(m => [m.file, m]));
+  const used = new Set();
+  let total = 0, done = 0;
+  const prio = { high: [0, 0], mid: [0, 0], low: [0, 0] }; // [済み, 全部]
+
+  const html = ROADMAP.map(area => {
+    let aDone = 0;
+    const rows = area.items.map(it => {
+      const names = [it.file, ...(it.alt || [])];
+      const hitName = names.find(n => byFile.has(n));
+      const memo = hitName ? byFile.get(hitName) : null;
+      names.forEach(n => used.add(n));
+      total++;
+      if (memo) { done++; aDone++; }
+      if (it.prio) { prio[it.prio][1]++; if (memo) prio[it.prio][0]++; }
+
+      const title = memo ? memo.title : (it.title || it.file);
+      const prioTag = it.prio ? `<span class="tag ${it.prio}">${PRIO_LABEL[it.prio]}</span>` : '';
+      const titleHtml = memo
+        ? `<a href="${esc(memo.file)}">${esc(title)}</a>${prioTag}`
+        : `${esc(title)}${prioTag}`;
+      const sub = memo
+        ? `<code>${esc(memo.file)}</code> · ${esc(memo.date || '')}${it.note ? ' · ' + esc(it.note) : ''}`
+        : `予定: <code>${esc(it.file)}</code>${it.note ? ' · ' + esc(it.note) : ''}`;
+      return `<li class="item ${memo ? 'done' : 'todo'}" data-state="${memo ? 'done' : 'todo'}" data-prio="${it.prio || ''}">
+        <span class="box" role="img" aria-label="${memo ? '済み' : '未着手'}"></span>
+        <div class="item-main"><div class="item-title">${titleHtml}</div><div class="item-sub">${sub}</div></div>
+      </li>`;
+    }).join('');
+    const n = area.items.length;
+    return `<section class="panel area" id="area-${area.id}">
+      <div class="panel-head"><h2>${esc(area.name)}</h2><span class="count">${aDone} / ${n}</span></div>
+      <div class="bar"><span style="width:${n ? (aDone / n * 100) : 0}%"></span></div>
+      ${area.note ? `<p class="note">${esc(area.note)}</p>` : ''}
+      <ul class="items">${rows}</ul>
+    </section>`;
+  }).join('');
+  document.getElementById('areas').innerHTML = html;
+
+  // 全体
+  document.getElementById('overall-num').innerHTML = `${done} <small>/ ${total}（${total ? Math.round(done / total * 100) : 0}%）</small>`;
+  document.getElementById('overall-bar').style.width = (total ? done / total * 100 : 0) + '%';
+  document.getElementById('prio-stats').innerHTML = ['high', 'mid', 'low']
+    .map(p => `<span>優先度 ${PRIO_LABEL[p]}の未着手: <strong class="mono">${prio[p][1] - prio[p][0]}</strong> / ${prio[p][1]}</span>`).join('')
+    + `<span>書いたメモ: <strong class="mono">${memos.filter(m => !IGNORE.has(m.file)).length}</strong> 本</span>`;
+
+  // ロードマップ外
+  const extra = memos.filter(m => !used.has(m.file) && !IGNORE.has(m.file));
+  document.getElementById('extra-box').innerHTML = extra.length
+    ? `<p class="note">どの項目にも当てはまらないメモ。合う分野の <code>ROADMAP</code> に足すとチェックリストに入ります</p>
+       <ul class="items">${extra.map(m => `<li class="item done" data-state="done">
+         <span class="box" role="img" aria-label="済み"></span>
+         <div class="item-main"><div class="item-title"><a href="${esc(m.file)}">${esc(m.title)}</a></div>
+         <div class="item-sub"><code>${esc(m.file)}</code> · ${esc(m.date || '')} · ${esc((m.tags || []).join(', '))}</div></div>
+       </li>`).join('')}</ul>`
+    : '<p class="msg">なし（すべてのメモがどこかの項目に入っている）</p>';
+
+  applyFilter(currentFilter);
+}
+
+// ── 絞り込み ───────────────────────────────────
+let currentFilter = 'all';
+function applyFilter(f) {
+  currentFilter = f;
+  document.querySelectorAll('.filter').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.filter === f)));
+  document.querySelectorAll('#areas .area').forEach(area => {
+    let shown = 0;
+    area.querySelectorAll('.item').forEach(li => {
+      const st = li.dataset.state, p = li.dataset.prio;
+      const ok = f === 'all' || (f === 'todo' && st === 'todo') || (f === 'done' && st === 'done')
+        || (f === 'high' && st === 'todo' && p === 'high');
+      li.classList.toggle('hidden-by-filter', !ok);
+      if (ok) shown++;
+    });
+    area.classList.toggle('empty-by-filter', shown === 0);
+  });
+}
+document.querySelector('.filters').addEventListener('click', e => {
+  const b = e.target.closest('.filter');
+  if (b) applyFilter(b.dataset.filter);
+});
+
+loadMemos().then(render).catch(err => {
+  document.getElementById('areas').innerHTML =
+    `<div class="panel err"><p>一覧データ（<code>memos.json</code>）を読み込めなかったので、チェックを付けられません。</p>
+     <p class="msg">公開サイト上で開くか、<code>memo.py build</code> の出力（<code>dist/</code>）から開いてください。（${esc(err.message)}）</p></div>`;
+  document.getElementById('extra-box').innerHTML = '<p class="msg">–</p>';
+});
+</script>
+</body>
+</html>

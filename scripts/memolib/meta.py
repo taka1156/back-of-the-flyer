@@ -8,7 +8,7 @@ import sys
 from html.parser import HTMLParser
 from pathlib import Path
 
-from .config import DOCS, HEAD_RE, NAME_RE, ROOT, SPECIAL_NAMES, read_text
+from .config import SRC, HEAD_RE, NAME_RE, ROOT, SPECIAL_NAMES, read_text
 
 class _Meta(HTMLParser):
     def __init__(self) -> None:
@@ -66,7 +66,7 @@ def git_added_date(path: Path) -> str:
 
 
 def memo_path(arg: str, must_exist: bool = True) -> Path:
-    """名前やパスを docs/ 内のメモのパスに解決する。"""
+    """名前やパスを src/ 内のメモのパスに解決する。"""
     p = Path(arg)
     if p.is_file():
         return p.resolve()
@@ -74,15 +74,16 @@ def memo_path(arg: str, must_exist: bool = True) -> Path:
     if not NAME_RE.match(name):
         sys.exit(f"ファイル名は英小文字・数字・ハイフンのみ: {name!r}")
     if f"{name}.html" in SPECIAL_NAMES:
-        sys.exit(f"{name}.html は特別なページです（トップ）。メモ名に使えません")
-    target = DOCS / f"{name}.html"
+        label = {"index": "トップ", "roadmap": "ロードマップ"}.get(name, "特別なページ")
+        sys.exit(f"{name}.html は特別なページです（{label}）。メモ名に使えません")
+    target = SRC / f"{name}.html"
     if must_exist and not target.is_file():
         sys.exit(f"見つかりません: {target.relative_to(ROOT)}")
     return target
 
 
 def memo_files() -> list[Path]:
-    return sorted(p for p in DOCS.glob("*.html") if p.name not in SPECIAL_NAMES)
+    return sorted(p for p in SRC.glob("*.html") if p.name not in SPECIAL_NAMES)
 
 
 def set_meta(text: str, name: str, value: str) -> str:

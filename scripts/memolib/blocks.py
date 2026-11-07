@@ -1,11 +1,11 @@
-"""各ページに差し込む自動生成ブロック（memo:head）と「一覧に戻る」フッター、
-サイト設定の差し込み、旧クイズの片付け。"""
+"""build が dist/ のページに差し込む自動生成ブロック（memo:head）と「一覧に戻る」フッター、
+サイト設定の差し込み、旧クイズの片付け。原本（src/）には自動生成ブロックを置かない。"""
 from __future__ import annotations
 
 import html
 import re
 
-from .config import (CONFIG, HEAD_BEGIN, HEAD_END, HEAD_RE, OG_VERSION, SITE_NAME, SITE_URL,
+from .config import (CONFIG, HEAD_BEGIN, HEAD_END, HEAD_RE, OG_VERSION, OPTIONAL_PAGES, SITE_NAME, SITE_URL,
                      SPECIAL_NAMES, accents)
 from .meta import parse_meta
 
@@ -99,10 +99,15 @@ def strip_quiz(text: str) -> str:
 #   <a href="…" data-memo-site-href="https://…/{repository}">  → 同じタグの href 属性を置き換える
 #   <meta … content="…" data-memo-site-content="{description}"> → content 属性を置き換える
 # 目印の属性はそのまま残るので、何度 build しても同じ結果になる。
+# オプションのページへのリンクなどには data-memo-if="項目" を付ける（項目は config.OPTIONAL_PAGES の値）。
+# memo.config.json でその項目がオフなら、要素ごと取り除く（オンなら何もしない）。
+#   <span data-memo-if="roadmap">· <a href="roadmap.html">ロードマップ</a></span>
+# 中に同じ名前のタグを入れ子にしない（最初の閉じタグまでを 1 つの要素とみなす）。
 
 SITE_TEXT_RE = re.compile(r'(<([a-zA-Z][\w-]*)\b[^>]*?\sdata-memo-site="([^"]*)"[^>]*>)(.*?)(</\2\s*>)', re.S)
 SITE_TAG_RE = re.compile(r'<[a-zA-Z][\w-]*\b[^>]*\sdata-memo-site-[a-z]+="[^"]*"[^>]*>')
 SITE_ATTR_RE = re.compile(r'\sdata-memo-site-([a-z]+)="([^"]*)"')
+SITE_IF_RE = re.compile(r'[ \t]*<([a-zA-Z][\w-]*)\b[^>]*?\sdata-memo-if="([^"]*)"[^>]*>.*?</\1\s*>[ \t]*\n?', re.S)
 
 
 def site_fields() -> dict[str, str]:
@@ -118,8 +123,16 @@ def _fill(template: str) -> str:
                          + ", ".join("{" + k + "}" for k in site_fields()) + f"）: {e}")
 
 
+def _keep_if(key: str) -> bool:
+    if key not in OPTIONAL_PAGES.values():
+        raise SystemExit(f"data-memo-if の項目が知らないもの: {key!r}（使える項目: {', '.join(OPTIONAL_PAGES.values())}）")
+    return bool(CONFIG[key])
+
+
 def apply_site(text: str) -> str:
-    """data-memo-site の目印が付いた要素・属性を memo.config.json の値で置き換える。"""
+    """data-memo-site の目印が付いた要素・属性を memo.config.json の値で置き換え、
+    data-memo-if の付いた要素をオフの項目なら取り除く。"""
+    text = SITE_IF_RE.sub(lambda m: m.group(0) if _keep_if(m.group(2)) else "", text)
     text = SITE_TEXT_RE.sub(
         lambda m: m.group(1) + html.escape(_fill(m.group(3)), quote=False) + m.group(5), text)
 
@@ -134,7 +147,12 @@ def apply_site(text: str) -> str:
     return SITE_TAG_RE.sub(tag, text)
 
 
+def strip_generated(text: str) -> str:
+    """自動生成ブロック（head）と旧クイズを取り除く。原本（src/）には置かず、build が dist/ のページにだけ入れる。"""
+    return strip_quiz(HEAD_RE.sub("", text))
+
+
 def apply_generated(text: str, filename: str) -> str:
-    """自動生成ブロック（head）とサイト設定の差し込みを最新にし、旧クイズを取り除く。"""
+    """自動生成ブロック（head）とサイト設定の差し込みを最新にし、旧クイズを取り除く（build が dist/ に書き出すページ用）。"""
     text = apply_head(apply_site(text), filename)
     return text if filename in SPECIAL_NAMES else strip_quiz(text)
