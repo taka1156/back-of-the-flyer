@@ -19,9 +19,10 @@ CONFIG_FILE = ROOT / "memo.config.json"
 SRC = ROOT / "src"  # 原本の置き場所（build は読むだけ）
 DIST = ROOT / "dist"  # build の出力。公開するサイト一式（GitHub Pages は dist ブランチから公開）
 INDEX = SRC / "index.html"
+SETTINGS_PAGE = SRC / "settings.html"  # 管理者がアクセント色を試して、固定する手順へ進むページ
 ROADMAP_PAGE = SRC / "roadmap.html"  # 書いたメモ・これから書くテーマのチェックリスト（memos.json で自動でチェック）
 # メモではない特別なページ（一覧に載せない・メモ名に使えない）。一覧データは memos.json から読み込む
-SPECIAL_PAGES = (INDEX, ROADMAP_PAGE)
+SPECIAL_PAGES = (INDEX, SETTINGS_PAGE, ROADMAP_PAGE)
 SPECIAL_NAMES = {p.name for p in SPECIAL_PAGES}
 # 使うかどうかを memo.config.json で選ぶページ（{ファイル名: 設定の項目}）。オフのときは build が dist/ に出さず、
 # ほかのページの data-memo-if="項目" の付いた要素（リンクなど）も取り除く
@@ -167,6 +168,33 @@ def repository_warning(repository: str = REPOSITORY) -> str:
     return (f"警告: {CONFIG_FILE.name} の repository {why}。"
             "入口スキルの clone 先・トップページのリンク・公開 URL が正しくなりません。"
             "自分のリポジトリ（owner/name）に書き換えてください")
+
+
+def set_accent(accent: str, accent_light: str = "", path: Path = CONFIG_FILE) -> dict:
+    """memo.config.json の branding.accent・accent_light だけを書き換える（ほかの項目と並び順はそのまま）。
+    accent_light が空なら項目を消し、accent から自動で決めさせる。
+    書き換えた結果が設定として正しくなければ、ファイルを元に戻して止める。返り値は読み直した設定。"""
+    original = path.read_text(encoding="utf-8") if path.is_file() else None
+    data = json.loads(original) if original else {}
+    if not isinstance(data, dict):
+        raise SystemExit(f"{path.name}: 全体を {{ ... }}（オブジェクト）で書いてください")
+    brand = data.get("branding")
+    brand = dict(brand) if isinstance(brand, dict) else {}
+    brand["accent"] = accent.strip()
+    if accent_light.strip():
+        brand["accent_light"] = accent_light.strip()
+    else:
+        brand.pop("accent_light", None)
+    data["branding"] = brand
+    path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    try:
+        return load_config(path)
+    except SystemExit:
+        if original is None:
+            path.unlink()
+        else:
+            path.write_text(original, encoding="utf-8")
+        raise
 
 
 def page_enabled(name: str, cfg: dict | None = None) -> bool:

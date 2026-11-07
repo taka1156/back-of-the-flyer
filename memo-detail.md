@@ -39,7 +39,7 @@ flowchart LR
   subgraph SRC["master ブランチ・src/（原本。手で書く）"]
     direction TB
     H["src/NAME.html<br/>本文・メタ情報"]
-    PG["src/index.html・roadmap.html"]
+    PG["src/index.html・settings.html・roadmap.html"]
     IMG["src/assets/*.png・favicon.ico<br/>（branding/ から生成）"]
     CFG["memo.config.json<br/>サイト名・リポジトリ・ブランチ"]
   end
@@ -67,8 +67,9 @@ flowchart LR
 | --- | --- | --- | --- |
 | `src/NAME.html` | メモ（原本） | 人 | 本文とメタ情報。自動生成ブロックは入れない（`build` が `dist/` のページにだけ入れる） |
 | `src/index.html` | トップページ（原本） | 人 | 一覧・検索・タグ絞り込み。データは `memos.json` から読む。サイト名・説明・リポジトリへのリンクは `build` が `memo.config.json` から入れる |
+| `src/settings.html` | 設定ページ（原本） | 人 | アクセント色を試し、Actions で固定する手順へ進む（トップページのフッターの「設定」から開く。[設定ページからアクセント色を変える](#設定ページからアクセント色を変える)）。今の色・サイト名・Actions へのリンクは `build` が入れる |
 | `src/roadmap.html` | ロードマップ（原本・オプション） | 人 | 書いたメモと、これから書くテーマを分野ごとに並べたチェックリスト。`memo.config.json` の `roadmap` が `true` のときだけ公開し、トップページのフッターの「ロードマップ」から開く（[ロードマップ（オプション）](#ロードマップオプション)） |
-| `memo.config.json` | 設定 | 人 | サイト名・説明・リポジトリ・ブランチ・デプロイ先のブランチ・タイムゾーン・ロードマップ・アクセント色とアイコン/OGP 画像の文字 |
+| `memo.config.json` | 設定 | 人（アクセント色は `memo.py accent` でも） | サイト名・説明・リポジトリ・ブランチ・デプロイ先のブランチ・タイムゾーン・ロードマップ・アクセント色とアイコン/OGP 画像の文字 |
 | `dist/NAME.html` など | 生成物 | `build` | 原本に `memo:head` ブロックとサイト設定を差し込んだ公開用のページ |
 | `dist/entry-skill/SKILL.md` | 生成物 | `build` | claude.ai のアプリ側に置く入口スキル（リポジトリ名とブランチ入り） |
 | `dist/memos.json` | 生成物 | `build` | 全メモのタイトル・説明・タグ・日付 |
@@ -127,11 +128,12 @@ python3 scripts/memo.py <コマンド> ...
 | `lint` | `lint MEMO... [--fix] [--backlink]` | 崩れのチェック。`--fix` で直せるものを直す | `--fix` のときだけ |
 | `meta` | `meta MEMO [--title] [--desc] [--tags] [--date]` | メタ情報を設定する | する |
 | `build` | `build [--check]` | `src/` から公開用のサイト一式を `dist/` に書き出す。`--check` は古いかどうかだけ調べる | `src/` はしない（`dist/` に書く） |
+| `accent` | `accent COLOR [LIGHT]` | `memo.config.json` のアクセント色だけを書き換える（`LIGHT` を省くと自動。ページへの反映は `build`） | `memo.config.json` だけ |
 | `list` | `list` | メモの一覧（日付・名前・タイトル・タグ）を表示 | しない |
-| `preview` | `preview MEMO\|index\|roadmap\|FILE [-o OUT]` | 自動生成ブロックを入れ、トップページ・ロードマップなら一覧データを埋め込んだ 1 枚の HTML を書き出す | 元のファイルはしない |
+| `preview` | `preview MEMO\|index\|settings\|roadmap\|FILE [-o OUT]` | 自動生成ブロックを入れ、トップページ・ロードマップなら一覧データを埋め込んだ 1 枚の HTML を書き出す | 元のファイルはしない |
 
 `MEMO` / `NAME` は `docker`・`docker.html`・`src/docker.html` のどれでもよく、既存のファイルパスを渡せばそのファイルが対象になります（下書きの点検に使えます）。
-名前は英小文字・数字・ハイフンだけで、`index`・`roadmap` は特別なページなのでメモ名に使えません。
+名前は英小文字・数字・ハイフンだけで、`index`・`settings`・`roadmap` は特別なページなのでメモ名に使えません。
 
 ## 登録の流れ
 
@@ -205,7 +207,7 @@ GitHub の画面から HTML を直接アップロードした場合も、Actions
 ```mermaid
 flowchart TB
   s1["① src/ のページ以外のファイルをコピーする<br/>assets/・CNAME・.nojekyll など"]
-  s2["② 各ページに自動生成ブロックを入れる<br/>メモ: memo:head（旧クイズは取り除く）/ index・roadmap: memo:head とサイト名など<br/>オプションのページ（roadmap）はオンのときだけ"]
+  s2["② 各ページに自動生成ブロックを入れる<br/>メモ: memo:head（旧クイズは取り除く）/ index・settings・roadmap: memo:head とサイト名など<br/>オプションのページ（roadmap）はオンのときだけ"]
   s3["③ 全メモの &lt;head&gt; から memos.json を作る<br/>日付の新しい順"]
   s4["④ md/*.md と llms.txt を作る"]
   s5["⑤ entry-skill/SKILL.md を作る"]
@@ -245,7 +247,7 @@ flowchart LR
 | ブロック | 入る場所 | 中身 | 作るもの |
 | --- | --- | --- | --- |
 | `<!-- memo:head -->` 〜 `<!-- /memo:head -->` | `</head>` の直前 | ファビコン・iOS アイコン・OGP（`og:title` / `og:description` は title / description から）、アクセント色（`branding.accent`・`accent_light`） | `build`・`preview`（原本に入っていたら `lint --fix` が取り除く） |
-| `data-memo-site` の付いた要素・属性 | `index.html`・`roadmap.html` の書いた場所 | `memo.config.json` の値（[サイトごとの設定](#サイトごとの設定memoconfigjson)）。目印の属性は残る | `build`・`preview` |
+| `data-memo-site` の付いた要素・属性 | `index.html`・`settings.html`・`roadmap.html` の書いた場所 | `memo.config.json` の値（[サイトごとの設定](#サイトごとの設定memoconfigjson)）。目印の属性は残る | `build`・`preview` |
 | `data-memo-if` の付いた要素 | `index.html` の書いた場所 | 設定の項目（`roadmap`）がオフなら要素ごと取り除く。オンならそのまま | `build`・`preview` |
 | `<footer id="memo-backlink">` | `</body>` の直前 | 「← 一覧に戻る」リンク。スタイルはインラインで完結 | `lint --backlink`（無いときだけ追加） |
 
@@ -302,9 +304,9 @@ flowchart LR
 - `branding` を変えても `build` だけでは画像は変わりません。`python3 branding/render.py` で作り直します（[日付と URL の決まり方](#日付と-url-の決まり方) の「URL」）。
 - `python3 scripts/memo.py config` で今の設定（と公開 URL）を表示できます。
 
-**トップ・ロードマップのページへの差し込み**
+**トップ・設定・ロードマップのページへの差し込み**
 
-`src/index.html`・`src/roadmap.html` のサイト名などは手で書かず、目印の属性を付けておくと `build` が設定の値で書き換えます。書式の中では `{site_name}`・`{description}`・`{repository}` が使えます。
+`src/index.html`・`src/settings.html`・`src/roadmap.html` のサイト名などは手で書かず、目印の属性を付けておくと `build` が設定の値で書き換えて `dist/` に書き出します（原本の値はそのまま）。書式の中では `{site_name}`・`{description}`・`{repository}`・`{branch}`・`{accent}`（ダーク用のアクセント色）・`{accent_light}`（ライト用。自動のときは計算した色）が使えます。
 
 ```html
 <h1 data-memo-site="{site_name}">MEMO</h1>                       <!-- 中身のテキストを置き換える -->
@@ -313,6 +315,26 @@ flowchart LR
 ```
 
 目印の属性は残るので、何度 `build` しても同じ結果になります。中身がテキストだけの要素に使います（子要素があると中身ごと置き換わります）。
+
+**設定ページからアクセント色を変える**
+
+GitHub Pages は表示するだけなので、ページから設定ファイルを書き換えることはできません。そこで、色を試すのは公開ページ（`settings.html`）、固定するのは GitHub Actions（`.github/workflows/set-accent.yml`、名前は `Set accent color`）に分けています。
+
+```mermaid
+flowchart LR
+  sp["settings.html<br/>候補・自分で選ぶ<br/>見え方とコントラスト比"] -->|"「GitHub で固定する」<br/>色の値をコピー"| run["Actions の画面<br/>Run workflow に色を貼る"]
+  run --> wf["Set accent color<br/>memo.py accent → render.py"]
+  wf -->|"commit・push（main）"| repo["memo.config.json と画像"]
+  wf -->|"続けて呼ぶ"| dep["Deploy MEMO<br/>build → dist ブランチ"]
+  dep -->|Pages| sp
+```
+
+- 設定ページで色を選ぶと、そのページの色だけがその場で変わります（ほかのページは固定するまで変わりません）。ライト用は「自動」にすると、`build` と同じ計算（白地とのコントラスト比 4.5 以上になるまで暗くする）で決まります。
+- 「GitHub で固定する」は、そのリポジトリの `Set accent color` の画面を開くだけです。色の値は自動では入らないので、ページに出た `accent`・`accent_light` をコピーして「Run workflow」の入力欄に貼ります（ライト用を自動にしたときは空のまま）。
+- 実行できるのは、リポジトリに書き込み権限がある人だけです。ページは公開されていますが、見た人が色を変えることはできません。
+- ワークフローは `python3 scripts/memo.py accent COLOR [LIGHT]` で `memo.config.json` の `branding.accent`・`accent_light` だけを書き換え（ほかの項目と並び順はそのまま）、必要なら画像を作り直して `Set accent color: …` としてコミット・push し、続けて `Deploy MEMO` を呼んで全ページを作り直して公開します（Actions からの push では push で動くワークフローが起動しないため、直接呼ぶ）。色の書き方が正しくなければ、何もコミットせずに止まります。
+- 「アイコン・OGP 画像も同じ色で作り直す」（`images`。既定でオン）のときは、Actions に playwright・chromium・Pillow・フォントを入れて `branding/render.py` も動かします。そのぶん 3〜5 分かかります。画像はそのままでよければチェックを外します（1〜2 分）。
+- 手元や Claude からは、`python3 scripts/memo.py accent '#3ddc97' '#0f7a50'` → `memo.config.json` をコミット・push すれば、Deploy MEMO が同じように公開します（手元の `build` は確認用）。
 
 **アプリ側の入口スキル**
 
@@ -353,7 +375,7 @@ flowchart LR
 - 公開 URL は `src/CNAME` の独自ドメインから決まります（無ければ `memo.config.json` の `repository` から GitHub Pages の URL `https://OWNER.github.io/REPO/` を作ります）。`og:url`・`og:image` の絶対 URL にも使います。
 - `og:image` には `og.png` の中身から作った短いハッシュ（`?v=…`）を付けます。画像を差し替えると URL が変わり、SNS 側の画像キャッシュが古いまま残るのを防げます。
 - アイコンと OGP 画像の生成元は `branding/`（`og.html`・`icon.html`・`leaf.css`）で、`python3 branding/render.py` で `src/assets/` に書き出します（`branding/` は公開されません）。文字と色は `memo.config.json`（`site_name`・`description`・公開 URL と `branding`）から差し込むので、HTML を直接書き換える必要はありません。
-- `render.py` だけは標準ライブラリでは動きません（playwright と chromium、Pillow、フォント Noto Sans CJK JP / DejaVu Sans Mono が必要。README の「必要なもの」）。Actions では動かさないので、設定を変えたら手元で実行し、できた画像をコミットします。`og.png` が変わると、次の `build`（デプロイ）で `og:image` の `?v=` が更新されます。
+- `render.py` だけは標準ライブラリでは動きません（playwright と chromium、Pillow、フォント Noto Sans CJK JP / DejaVu Sans Mono が必要。README の「必要なもの」）。Actions では `Set accent color` だけが動かします。それ以外の設定（サイト名・`branding` の文字など）を変えたら手元で実行し、できた画像をコミットします。`og.png` が変わると、次の `build`（デプロイ）で `og:image` の `?v=` が更新されます。
 
 ## 表示の確認とプレビュー
 
@@ -387,13 +409,13 @@ flowchart LR
 
 | 項目 | 内容 |
 | --- | --- |
-| 起動する変更 | `src/` 以下・`scripts/` 以下・`memo.config.json`・このワークフロー（手動実行も可） |
+| 起動する変更 | `src/` 以下・`scripts/` 以下・`memo.config.json`・このワークフロー（手動実行も可。`Set accent color` からも呼ばれる） |
 | 手順 | 履歴ごと checkout（日付の推定に使う）→ 全メモを `lint`（報告のみ。メモが 0 本なら省略）→ `build` |
 | コミット | dist ブランチを `dist/` の中身で丸ごと置き換え、変わっていれば `Deploy <元のコミット>` としてコミット・push。dist ブランチの履歴は残るので、生成物の変化も追える。ブランチがまだなければ履歴のない（orphan）ブランチとして作る |
 | 原本のブランチ | 何もコミットしない（以前の `Rebuild MEMO index` のような Actions のコミットは入らない） |
 | 同時実行 | 同じブランチの実行は 1 本ずつ順番に動く（`concurrency`。途中で止めない）。dist ブランチに書くのはこのワークフローだけなので、push の競合は起きない |
 
-もう 1 つの `.github/workflows/test.yml`（`Test memo.py`）は、`scripts/`・`tests/`・トップ・ロードマップのページ・`memo.config.json`・テンプレートが変わったとき（どのブランチでも、PR も含む）にテストを流します。リポジトリは書き換えません。
+もう 1 つの `.github/workflows/test.yml`（`Test memo.py`）は、`scripts/`・`tests/`・トップ・設定・ロードマップのページ・`memo.config.json`・テンプレートが変わったとき（どのブランチでも、PR も含む）にテストを流します。リポジトリは書き換えません。
 
 ## コードの構成とテスト
 
@@ -447,7 +469,7 @@ flowchart LR
 
 標準ライブラリの `unittest` だけで動きます。一時フォルダに作った「作業用リポジトリ」で動かすので、リポジトリ自体は書き換えません。
 
-ほとんどのテストは、仕組みのファイル（`scripts/`・テンプレート・`src/` の `index.html`・`roadmap.html`・`.nojekyll`・`assets/`）に `tests/fixtures/` のサンプルのメモ 2 本と設定を組み合わせて動きます。本物のメモが 1 本もない（仕組みだけを取り出した）リポジトリでも通ります。本物のメモを確かめるテスト（原本に自動生成ブロックや生成物が混ざっていないか、`build` で `src/` が変わらないか、全メモが lint を通るか）は、メモがあるときだけ動きます。
+ほとんどのテストは、仕組みのファイル（`scripts/`・テンプレート・`src/` の `index.html`・`settings.html`・`roadmap.html`・`.nojekyll`・`assets/`）に `tests/fixtures/` のサンプルのメモ 2 本と設定を組み合わせて動きます。本物のメモが 1 本もない（仕組みだけを取り出した）リポジトリでも通ります。本物のメモを確かめるテスト（原本に自動生成ブロックや生成物が混ざっていないか、`build` で `src/` が変わらないか、全メモが lint を通るか）は、メモがあるときだけ動きます。
 
 ```bash
 python3 -B -m unittest discover -s tests       # 全部（15 秒ほど）
@@ -493,7 +515,7 @@ python3 -B tests/snapshot.py OUTDIR            # 全コマンドの出力を保�
 | `scripts/`・`tests/`（`tests/fixtures/` を含む） | `memo.py` とテスト |
 | `.claude/skills/` | スキルとメモの雛形 |
 | `.github/workflows/` | 生成とテストのワークフロー |
-| `src/index.html`・`src/roadmap.html`・`src/.nojekyll`・`src/assets/` | トップページ、ロードマップ（オプション）、アイコン |
+| `src/index.html`・`src/settings.html`・`src/roadmap.html`・`src/.nojekyll`・`src/assets/` | トップページ、設定ページ、ロードマップ（オプション）、アイコン |
 | `branding/` | アイコンと OGP 画像の生成元 |
 | `memo.config.json`・`README.md`・`memo-detail.md`・`LICENSE`・`.gitignore` | 設定・説明・ライセンス |
 
@@ -508,7 +530,7 @@ python3 -B tests/snapshot.py OUTDIR            # 全コマンドの出力を保�
 
 ```bash
 # 1. サンプルのメモと生成物を消す
-find src -maxdepth 1 -name '*.html' ! -name index.html ! -name roadmap.html -delete
+find src -maxdepth 1 -name '*.html' ! -name index.html ! -name settings.html ! -name roadmap.html -delete
 rm -rf dist
 # 2. memo.config.json の site_name・description・llms_description・repository・branch・deploy_branch・utc_offset_hours・roadmap・branding を自分のリポジトリに合わせる
 # 3. 作り直して確かめる

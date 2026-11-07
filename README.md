@@ -4,6 +4,7 @@ Claude に作ってもらった図解つきの解説ページ（HTML）を、Git
 このリポジトリは **テンプレートリポジトリ** なので、「Use this template」から自分のリポジトリを作って使います。
 
 - トップページ: `src/index.html`（メモ一覧・検索・タグ絞り込み）
+- 設定ページ: `src/settings.html`（アクセント色を候補から選ぶか自分で決めて試し、GitHub Actions でサイト全体に固定する。下の「アクセント色を変える」）
 - ロードマップ（オプション）: `src/roadmap.html`（書いたメモとこれから書くテーマのチェックリスト。メモを公開すると自動でチェックが付く。`memo.config.json` の `"roadmap"` を `true` にすると公開され、トップページからリンクされる。詳しくは [memo-detail.md の「ロードマップ（オプション）」](memo-detail.md#ロードマップオプション)）
 - AI 向けの Markdown 版: `dist/md/` と `dist/llms.txt`（公開 URL を渡せば、リポジトリを繋いでいない会話でも Claude が過去のメモを読める）
 - 設定: `memo.config.json`（サイト名・説明・リポジトリ・ブランチ・タイムゾーン・アイコンと OGP 画像。コードやスキルには直接書かない）
@@ -30,8 +31,8 @@ GitHub でこのリポジトリの「Use this template」→「Create a new repo
 ### 2. サンプルを消す
 
 ```bash
-find src -maxdepth 1 -name '*.html' ! -name index.html ! -name roadmap.html -delete   # サンプルのメモ
-rm -rf dist                                                                # 生成物（build で作り直す。コミットはされない）
+find src -maxdepth 1 -name '*.html' ! -name index.html ! -name settings.html ! -name roadmap.html -delete   # サンプルのメモ
+rm -rf dist                                                                                  # 生成物（build で作り直す。コミットはされない）
 ```
 
 ### 3. `memo.config.json` を書き換える
@@ -82,6 +83,18 @@ python3 -B -m unittest discover -s tests   # テスト
 - **Claude Code や、リポジトリを繋いだ claude.ai の会話**: `.claude/skills/` のスキルがそのまま使えます（下の「Claude に頼むとき」）。
 - **claude.ai のアプリ**: `dist/entry-skill/SKILL.md`（`build` が設定から生成。dist ブランチにも入る）をアプリ側のスキルとして登録します（下の「アプリ（claude.ai）から使うとき」）。
 
+## アクセント色を変える
+
+見出し・強調・リンクの色（アクセント色）は、公開したサイトの設定ページ（`https://…/settings.html`。トップページのいちばん下の「設定」から開けます）から変えられます。サーバーはないので、ページで試した色を GitHub Actions で固定します。
+
+1. 設定ページで候補から選ぶか、自分で色を決める（そのページだけがその場で変わり、ダーク・ライトでの見え方とコントラスト比が出ます）。
+2. 「GitHub で固定する」で Actions の `Set accent color` を開き、「Run workflow」にページに出た `accent`・`accent_light` を貼って実行する。
+3. Actions が `memo.config.json` を書き換え、アイコン・OGP 画像を同じ色で作り直してコミットし、続けて `Deploy MEMO` で全ページを作り直して公開します。3〜5 分でサイトに反映されます（画像はそのままでよければ、実行時に「アイコン・OGP 画像も…」のチェックを外すと 1〜2 分）。
+
+- 実行できるのはリポジトリに書き込み権限がある人だけです（ページを見た人は色を試せるだけで、変えられません）。
+- 手元では `python3 scripts/memo.py accent '#3ddc97' '#0f7a50'` で `memo.config.json` を書き換えて push しても同じです（`build` は手元での確認用。公開は `Deploy MEMO` が行う）。
+- 手元で変えたときは、画像も揃えるなら `python3 branding/render.py` も実行してコミットします（`memo.py accent` と `build` だけでは画像は変わりません）。
+
 ## 必要なもの
 
 | 用途 | 必要なもの |
@@ -89,7 +102,7 @@ python3 -B -m unittest discover -s tests   # テスト
 | `scripts/memo.py`（登録・点検・生成）とテスト | Python 3.8 以上（標準ライブラリのみ。テストは 3.11・3.12 で確認、GitHub Actions は 3.12）、git |
 | 公開 | GitHub Pages（dist ブランチを公開）、GitHub Actions（build・デプロイとテスト） |
 | ページの表示 | 閲覧者のブラウザが Google Fonts（`fonts.googleapis.com` の Noto Sans JP・JetBrains Mono）を読み込みます。読めないときはシステムのフォントで表示されます。メモによっては cdnjs のライブラリを使います（[memo-style](.claude/skills/memo-style/SKILL.md)） |
-| `branding/render.py`（アイコン・OGP 画像の生成。設定を変えたときだけ） | `pip install playwright pillow` と `python3 -m playwright install chromium`、フォント Noto Sans CJK JP・DejaVu Sans Mono（Ubuntu なら `apt install fonts-noto-cjk fonts-dejavu-core`）。Actions では動かさないので手元で実行してコミットする |
+| `branding/render.py`（アイコン・OGP 画像の生成。設定を変えたときだけ） | `pip install playwright pillow` と `python3 -m playwright install chromium`、フォント Noto Sans CJK JP・DejaVu Sans Mono（Ubuntu なら `apt install fonts-noto-cjk fonts-dejavu-core`）。Actions では、設定ページから色を固定する `Set accent color` だけがこれを入れて動かす。それ以外は手元で実行してコミットする |
 
 ## Claude に頼むとき
 

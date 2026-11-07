@@ -7,7 +7,7 @@ src/ と memo.config.json を対象にする。
 作業用リポジトリは 2 種類:
 
 - Workspace()          仕組みのテスト用。仕組みのファイル（scripts/、テンプレート、src/ の index.html・
-                       roadmap.html・assets/）に、tests/fixtures/ のサンプルのメモと設定を組み合わせて build したもの。
+                       settings.html・roadmap.html・assets/）に、tests/fixtures/ のサンプルのメモと設定を組み合わせて build したもの。
                        本物のメモが 1 本もなくても（仕組みだけを取り出したリポジトリでも）動く。
 - Workspace(real=True) このリポジトリの src/ と設定をそのままコピーしたもの。原本がきれいか（自動生成ブロックが
                        混ざっていないか）など、本物の中身を確かめるテストと tests/snapshot.py が使う。
@@ -30,7 +30,7 @@ TEMPLATE_REL = Path(".claude/skills/memo-style/template.html")
 CONFIG_NAME = "memo.config.json"
 ENTRY_REL = Path("entry-skill/SKILL.md")  # dist/ からの相対パス
 # src/ のうち、メモではなく仕組みの一部として持っていくもの
-MECHANISM_DOCS = ("index.html", "roadmap.html", ".nojekyll", "assets")
+MECHANISM_DOCS = ("index.html", "settings.html", "roadmap.html", ".nojekyll", "assets")
 GIT_ENV = {"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.com",
            "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@example.com"}
 

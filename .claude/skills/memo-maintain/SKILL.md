@@ -1,6 +1,6 @@
 ---
 name: memo-maintain
-description: CheatSheet リポジトリの Python スクリプト（scripts/memo.py・scripts/memolib/・tests/）やトップ・ロードマップページの JS、GitHub Actions を直すときの手順。「memo.py を直して」「コマンドを追加して」「リファクタして」「テストを足して」などで使う。メモの作成・登録・参照には使わない（memo-style / memo-publish / memo-reference）。
+description: CheatSheet リポジトリの Python スクリプト（scripts/memo.py・scripts/memolib/・tests/）やトップ・設定・ロードマップページの JS、GitHub Actions を直すときの手順。「memo.py を直して」「コマンドを追加して」「リファクタして」「テストを足して」などで使う。メモの作成・登録・参照には使わない（memo-style / memo-publish / memo-reference）。
 ---
 
 # memo-maintain
@@ -13,7 +13,7 @@ CheatSheet の仕組みそのもの（スクリプト・共通ファイル・ワ
 - **標準ライブラリだけ。** pip で何かを入れないと動かない形にしない（BeautifulSoup・pytest なども使わない。テストは `unittest`）。
 - **入口は `python3 scripts/memo.py` のまま。** スキル・README・Actions がこの呼び方に依存している。処理の本体は `scripts/memolib/` に置き、`memo.py` はコマンドの受け付けだけにする。
 - **置き場所を知っているのは `memolib/config.py` だけ。** 他のモジュールやスキルでパスを組み立てない。
-- **サイトごとの値は `memo.config.json` だけ。** サイト名・リポジトリ・ブランチ・タイムゾーン・ドメインを、コード・スキル・ワークフロー・`index.html`・`roadmap.html` に直接書かない（ページには `data-memo-site` の目印を付けて `build` に入れさせる。スキルは `memo.py config KEY` で読む）。仕組みだけを別のリポジトリに持っていけるようにするため。
+- **サイトごとの値は `memo.config.json` だけ。** サイト名・リポジトリ・ブランチ・タイムゾーン・ドメインを、コード・スキル・ワークフロー・`index.html`・`settings.html`・`roadmap.html` に直接書かない（ページには `data-memo-site` の目印を付けて `build` に入れさせる。スキルは `memo.py config KEY` で読む）。仕組みだけを別のリポジトリに持っていけるようにするため。
 - **テストは本物のメモに頼らない。** 新しいテストは `tests/fixtures/` のサンプル（`Workspace()`）で書く。本物のメモを確かめるものだけ `RepositoryTest` に置く（メモがないと飛ばされる）。
 - **原本は `src/`、生成物は `dist/`。** `build` は `src/` を読むだけで書き換えず、公開するサイト一式（自動生成ブロック入りのページ・`memos.json`・`md/`・`llms.txt`・入口スキル）を `dist/` に書き出す。生成物を手で直さず、生成する側を直して `build` する。`dist/` はコミットしない（`.gitignore` 済み）。
 - **何度実行しても同じ結果になる。** lint・build・meta を 2 回続けて実行しても 2 回目は何も変わらないこと。`dist/` を消して build し直しても同じ中身になること（テストで確かめている）。
@@ -25,9 +25,10 @@ CheatSheet の仕組みそのもの（スクリプト・共通ファイル・ワ
 | --- | --- |
 | `scripts/memo.py` | コマンドの受け付け（`cmd_*` と `main`）だけ |
 | `memo.config.json` | サイトごとの値（サイト名・説明・リポジトリ・ブランチ・タイムゾーン） |
-| `memolib/config.py` | 置き場所（原本の `src/`・出力の `dist/`）・`memo.config.json` の読み込み・公開 URL・日付・アクセント色の計算・自動生成ブロックの目印 |
+| `memolib/config.py` | 置き場所（原本の `src/`・出力の `dist/`）・`memo.config.json` の読み込みとアクセント色の書き換え（`set_accent`）・公開 URL・日付・アクセント色の計算・自動生成ブロックの目印 |
 | `memolib/meta.py` | `<head>` のメタ情報の読み書き、名前からパスへの解決 |
 | `memolib/blocks.py` | 自動生成ブロック（memo:head）、サイト設定の差し込み（`apply_site`）、フッター、廃止したクイズの片付け（`strip_quiz`） |
+| `src/settings.html` の JS | アクセント色の候補（`PRESETS`）と、ライト用の自動計算（`config.light_accent` と同じ式。変えたら両方を直す） |
 | `memolib/entry.py` | アプリ側の入口スキル（`dist/entry-skill/SKILL.md`）の中身 |
 | `memolib/lint.py` | 崩れのチェックと自動修正 |
 | `memolib/markdown.py` | AI 向けの Markdown 版 |
