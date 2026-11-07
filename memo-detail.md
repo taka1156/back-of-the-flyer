@@ -72,8 +72,8 @@ flowchart LR
 | `src/NAME.html` | メモ（原本） | 人 | 本文とメタ情報と問題データ。自動生成ブロックは入れない（`build` が `dist/` のページにだけ入れる） |
 | `src/index.html` | トップページ（原本） | 人 | 一覧・検索・タグ絞り込み・ランダムクイズ。データは JSON から読む。サイト名・説明・リポジトリへのリンクは `build` が `memo.config.json` から入れる |
 | `src/quiz.html` | クイズページ（原本） | 人 | ランダム 10 問・カテゴリ別 10 問と、タイムアタック（制限時間内に何問正解できるか。ランダムかカテゴリ別）。カテゴリは複数選べ、どれかに入る問題から出す。データは JSON から読む。サイト名は `build` が入れる |
-| `src/settings.html` | 設定ページ（原本） | 人 | アクセント色を試し、Actions で固定する手順へ進む（トップページのフッターの「設定」から開く。[設定ページからアクセント色を変える](#設定ページからアクセント色を変える)）。今の色・サイト名・Actions へのリンクは `build` が入れる |
-| `src/roadmap.html` | ロードマップ（原本・オプション） | 人 | 書いたメモと、これから書くテーマを分野ごとに並べたチェックリスト。`memo.config.json` の `roadmap` が `true` のときだけ公開し、トップページのフッターの「ロードマップ」から開く（[ロードマップ（オプション）](#ロードマップオプション)）。項目はページのスクリプト冒頭の `ROADMAP` に書き、`memos.json` に項目のファイル名（`file` か別名の `alt`）があれば自動でチェックが付く。どの項目にも当てはまらないメモは「ロードマップ外のメモ」に並ぶ。サイト名は `build` が入れる |
+| `src/settings.html` | 設定ページ（原本） | 人 | アクセント色を試し、Actions で固定する手順へ進む（各ページ上部のナビ、またはトップページのフッターの「設定」から開く。[設定ページからアクセント色を変える](#設定ページからアクセント色を変える)）。今の色・サイト名・Actions へのリンクは `build` が入れる |
+| `src/roadmap.html` | ロードマップ（原本・オプション） | 人 | 書いたメモと、これから書くテーマを分野ごとに並べたチェックリスト。`memo.config.json` の `roadmap` が `true` のときだけ公開し、各ページ上部のナビ、またはトップページのフッターの「ロードマップ」から開く（[ロードマップ（オプション）](#ロードマップオプション)）。項目はページのスクリプト冒頭の `ROADMAP` に書き、`memos.json` に項目のファイル名（`file` か別名の `alt`）があれば自動でチェックが付く。どの項目にも当てはまらないメモは「ロードマップ外のメモ」に並ぶ。サイト名は `build` が入れる |
 | `memo.config.json` | 設定 | 人（アクセント色は `memo.py accent` でも） | サイト名・説明・リポジトリ・ブランチ・デプロイ先のブランチ・タイムゾーン・アクセント色とアイコン/OGP 画像の文字 |
 | `dist/NAME.html` など | 生成物 | `build` | 原本に `memo:head`・`memo:quiz` ブロックとサイト設定を差し込んだ公開用のページ |
 | `dist/entry-skill/SKILL.md` | 生成物 | `build` | claude.ai のアプリ側に置く入口スキル（リポジトリ名とブランチ入り） |
@@ -394,7 +394,7 @@ claude.ai のアプリに置く入口スキルは「このリポジトリを取�
 
 ### ロードマップ（オプション）
 
-`src/roadmap.html` は、書いたメモとこれから書くテーマを分野ごとに並べたチェックリストです。必ず要るものではないので、既定ではオフです。`memo.config.json` に `"roadmap": true` を書いて `build` すると公開され、トップページのフッターに「ロードマップ」のリンクが出ます。
+`src/roadmap.html` は、書いたメモとこれから書くテーマを分野ごとに並べたチェックリストです。必ず要るものではないので、既定ではオフです。`memo.config.json` に `"roadmap": true` を書いて `build` すると公開され、各ページ上部のナビとトップページのフッターに「ロードマップ」のリンクが出ます。
 
 - 項目はページのスクリプト冒頭の `ROADMAP` に書きます。書いたメモは `file` だけ、これから書くテーマは `title`・`prio`（`high` / `mid` / `low`）・`note` も書きます。別の名前でも済みにしたいときは `alt` にファイル名を並べます。
 - 項目を相談して決める・その順にメモを書く・書いたメモを項目に足す、は [memo-roadmap](.claude/skills/memo-roadmap/SKILL.md) の手順で行います（「次のメモを書いて」など）。
@@ -547,6 +547,7 @@ python3 -B tests/snapshot.py OUTDIR            # 全コマンドの出力を保�
 | サイトのアクセント色 | 設定ページ（`src/settings.html`）から Actions の `Set accent color`、または `memo.py accent` | Actions なら何もしなくてよい（画像も作り直す）。手元なら `build`（全ページが書き換わる。画像も揃えるなら `python3 branding/render.py`） |
 | アイコン・OGP 画像の文字・色 | `memo.config.json`（`site_name`・`description`・`branding`） | `python3 branding/render.py` → `build` |
 | アイコン・OGP 画像のデザイン | `branding/`（`og.html`・`icon.html`・`leaf.css`、テーマの色は `render.py` の `THEMES`） | `python3 branding/render.py` → `build` |
+| ページ上部のナビ（一覧・クイズ・ロードマップ・設定） | 4 ページ（`src/index.html`・`quiz.html`・`roadmap.html`・`settings.html`）それぞれの `<nav class="nav">` と `.nav` の CSS（同じものを 4 か所に置いているので、変えるときは揃える。クイズ・ロードマップの項目は `data-memo-if` で設定に連動） | 何もしなくてよい |
 | トップ・クイズ・設定ページの見た目 | `src/index.html`・`src/quiz.html`・`src/settings.html` | 何もしなくてよい（サイト名などを入れる場所を増やしたら `build`） |
 | クイズを使う・やめる | `memo.config.json` の `quiz` | `build`（オフにすると `dist/` からクイズのページ・データ・表示が消える） |
 | ロードマップを使う・やめる | `memo.config.json` の `roadmap` | `build`（オフにすると `dist/` からページとリンクが消える） |
