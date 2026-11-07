@@ -1,0 +1,7 @@
+# MemoKit
+
+> Claude に作ってもらった解説ページの集まり。各リンク先は本文を Markdown にしたもので、元のページへの URL も含む。
+
+## Memos
+
+- [Vite+ と vp コマンド チートシート](https://repo.github.io/sample/md/vite-plus.md): Vite・Vitest・Oxlint などを 1 つにまとめた Vite+ の機能と、vp コマンドの使い方を用途別に一覧にしたチートシート。（Vite, JavaScript, ツール / 2026-11-07）
