@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title data-memo-site="{site_name} 設定">CheatSheet 設定</title>
+<meta name="description" content="CheatSheet のアクセント色を試して、サイト全体に固定するためのページ" data-memo-site-content="{site_name} のアクセント色を試して、サイト全体に固定するためのページ">
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Noto+Sans+JP:wght@400;500;700&display=swap">
+<style>
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --fg: #1c2230;
+  --fg-2: #5a6376;
+  --line: #dde1e8;
+  --accent: #0077b6;
+  --chip: #eceff4;
+  --ok: #1a7f37;
+  --ng: #cf222e;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0a0e14;
+    --surface: #111823;
+    --fg: #cdd9e5;
+    --fg-2: #7d8b9d;
+    --line: #1e2d3d;
+    --accent: #00d4ff;
+    --chip: #18222f;
+    --ok: #3fb950;
+    --ng: #f85149;
+  }
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: 'Noto Sans JP', system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.7;
+  min-height: 100vh;
+  padding: 48px 16px 64px;
+}
+.wrap { max-width: 720px; margin: 0 auto; }
+header { margin-bottom: 24px; }
+.back { font: 600 0.75rem 'JetBrains Mono', monospace; color: var(--fg-2); text-decoration: none; }
+.back:hover { color: var(--accent); }
+h1 {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 1.6rem;
+  letter-spacing: 0.12em;
+  color: var(--accent);
+  margin-top: 8px;
+}
+.lead { color: var(--fg-2); font-size: 0.85rem; margin-top: 4px; }
+[hidden] { display: none !important; }
+code, .mono { font-family: 'JetBrains Mono', monospace; }
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 14px;
+}
+.panel h2 { font-size: 1rem; margin-bottom: 4px; }
+.panel .note { color: var(--fg-2); font-size: 0.8rem; margin-bottom: 14px; }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  border: 1px solid var(--line);
+  background: var(--chip);
+  color: var(--fg);
+  border-radius: 999px;
+  padding: 8px 18px;
+  font: 700 0.85rem 'Noto Sans JP', system-ui, sans-serif;
+  cursor: pointer;
+  text-decoration: none;
+}
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+.btn.primary:hover { color: var(--bg); filter: brightness(1.08); }
+.btn.small { padding: 4px 12px; font-size: 0.75rem; }
+
+/* 今の色・選んだ色 */
+.pair { display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 0.85rem; }
+.pair span { display: inline-flex; align-items: center; gap: 8px; }
+.dot { width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--line); flex: none; }
+.label { color: var(--fg-2); font-size: 0.75rem; }
+
+/* 候補 */
+.presets { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.preset {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--chip);
+  color: var(--fg);
+  font: 600 0.82rem 'Noto Sans JP', system-ui, sans-serif;
+  cursor: pointer;
+  text-align: left;
+}
+.preset:hover { border-color: var(--accent); }
+.preset[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
+.preset .dots { display: inline-flex; }
+.preset .dots .dot + .dot { margin-left: -6px; }
+
+/* 自分で決める */
+.pick { display: grid; grid-template-columns: auto 1fr; gap: 10px 14px; align-items: center; font-size: 0.85rem; }
+.pick input[type=color] { width: 44px; height: 32px; border: 1px solid var(--line); border-radius: 6px; background: none; padding: 2px; cursor: pointer; }
+.pick input[type=color]:disabled { opacity: .45; cursor: default; }
+.auto { display: inline-flex; align-items: center; gap: 6px; color: var(--fg-2); font-size: 0.8rem; margin-left: 10px; }
+
+/* 見え方。サイトの背景・文字の色は固定なので、ここだけ実際の色で描く */
+.previews { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+.pv { border-radius: 10px; padding: 16px; border: 1px solid var(--line); }
+.pv.dark { background: #0a0e14; color: #cdd9e5; }
+.pv.light { background: #f6f7f9; color: #1c2230; }
+.pv .mode { font: 600 0.7rem 'JetBrains Mono', monospace; opacity: .7; }
+.pv .h { font-weight: 700; font-size: 1.05rem; margin: 2px 0 4px; }
+.pv p { font-size: 0.82rem; }
+.pv .box { margin-top: 8px; padding: 6px 10px; border-left: 3px solid; font-size: 0.78rem; }
+.pv.dark .box { background: #111823; }
+.pv.light .box { background: #ffffff; }
+.cr { margin-top: 8px; font: 0.72rem 'JetBrains Mono', monospace; }
+.cr.bad { font-family: 'Noto Sans JP', system-ui, sans-serif; font-weight: 700; }
+.pv.dark .cr.bad { color: #f85149; }
+.pv.light .cr.bad { color: #cf222e; }
+
+/* 固定する */
+.values { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+.value { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 12px; background: var(--chip); border-radius: 8px; }
+.value .k { font: 600 0.78rem 'JetBrains Mono', monospace; color: var(--fg-2); min-width: 7.5em; }
+.value code { font-size: 0.9rem; font-weight: 700; flex: 1; }
+.steps { padding-left: 1.4em; font-size: 0.85rem; margin-bottom: 14px; }
+.steps li + li { margin-top: 4px; }
+details { margin-top: 14px; font-size: 0.82rem; color: var(--fg-2); }
+details summary { cursor: pointer; }
+details pre { margin-top: 8px; padding: 10px 12px; background: var(--chip); border-radius: 8px; color: var(--fg); font: 0.8rem/1.6 'JetBrains Mono', monospace; overflow-x: auto; }
+.copied { color: var(--ok); font-size: 0.75rem; }
+footer { margin-top: 40px; font-size: 0.75rem; color: var(--fg-2); text-align: center; }
+footer a { color: var(--accent); }
+</style>
+<!-- memo:head（scripts/memo.py が自動生成。手で編集しない） -->
+<link rel="icon" href="assets/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-title" content="CheatSheet">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="CheatSheet">
+<meta property="og:title" content="CheatSheet 設定">
+<meta property="og:description" content="CheatSheet のアクセント色を試して、サイト全体に固定するためのページ">
+<meta property="og:url" content="https://cs.taka1156.site/settings.html">
+<meta property="og:image" content="https://cs.taka1156.site/assets/og.png?v=e0cb0951">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<style id="memo-accent">html:root{--accent:#0077b6}@media (prefers-color-scheme: dark){html:root{--accent:#00d4ff}}</style>
+<!-- /memo:head -->
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="back" href="index.html">&larr; 一覧に戻る</a>
+    <h1>SETTINGS</h1>
+    <p class="lead">サイトのアクセント色（見出し・強調・リンクの色）を試して、全ページに固定します</p>
+  </header>
+
+  <section class="panel">
+    <h2>今の色</h2>
+    <p class="note">memo.config.json の branding に入っている色です（build のときに入れたもの）</p>
+    <div class="pair">
+      <span><i class="dot" id="cur-dark-dot"></i><span class="label">ダーク</span><code id="cur-dark" data-memo-site="{accent}">#00d4ff</code></span>
+      <span><i class="dot" id="cur-light-dot"></i><span class="label">ライト</span><code id="cur-light" data-memo-site="{accent_light}">#0077b6</code></span>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>候補から選ぶ</h2>
+    <p class="note">どれもサイトの背景で読める濃さの組み合わせです。選ぶとこのページの色も変わります（ほかのページは固定するまで変わりません）</p>
+    <div class="presets" id="presets"></div>
+  </section>
+
+  <section class="panel">
+    <h2>自分で決める</h2>
+    <p class="note">ダーク用の色を決めると、ライト用は白地で読める濃さまで自動で暗くした色になります（自動を外すと自分で選べます）</p>
+    <div class="pick">
+      <input type="color" id="pick-dark" aria-label="ダークモードのアクセント色">
+      <span><span class="label">ダーク</span> <code id="pick-dark-hex"></code></span>
+      <input type="color" id="pick-light" aria-label="ライトモードのアクセント色">
+      <span><span class="label">ライト</span> <code id="pick-light-hex"></code>
+        <label class="auto"><input type="checkbox" id="auto-light">自動</label></span>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>見え方</h2>
+    <p class="note">サイトの背景に置いたときの見え方と、背景とのコントラスト比です（文字として読みやすいのは 4.5 以上）</p>
+    <div class="previews">
+      <div class="pv dark">
+        <div class="mode">DARK</div>
+        <div class="h" data-ac="dark">見出しの色</div>
+        <p>本文の中の <span data-ac="dark">リンク</span> や <b data-ac="dark">強調</b></p>
+        <div class="box" data-acb="dark">ポイントの囲み</div>
+        <div class="cr" id="cr-dark"></div>
+      </div>
+      <div class="pv light">
+        <div class="mode">LIGHT</div>
+        <div class="h" data-ac="light">見出しの色</div>
+        <p>本文の中の <span data-ac="light">リンク</span> や <b data-ac="light">強調</b></p>
+        <div class="box" data-acb="light">ポイントの囲み</div>
+        <div class="cr" id="cr-light"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>この色に固定する</h2>
+    <p class="note">固定すると GitHub Actions が memo.config.json を書き換え、全ページを作り直してコミットします。書き込めるのはリポジトリに書き込み権限がある人だけです</p>
+    <div class="values">
+      <div class="value"><span class="k">accent</span><code id="out-dark"></code><button class="btn small" type="button" data-copy="out-dark">コピー</button><span class="copied" hidden>コピーしました</span></div>
+      <div class="value"><span class="k">accent_light</span><code id="out-light"></code><button class="btn small" type="button" data-copy="out-light">コピー</button><span class="copied" hidden>コピーしました</span></div>
+    </div>
+    <ol class="steps">
+      <li>下のボタンで GitHub の Actions のページ（Set accent color）を開く</li>
+      <li>右上の「Run workflow」を押し、上の 2 つの値を入力欄に貼る（accent_light が空なら空のまま）</li>
+      <li>緑の「Run workflow」を押す。アイコン・OGP 画像も同じ色で作り直すので、反映まで 3〜5 分ほどかかります（画像はそのままでよければ「アイコン・OGP 画像も…」のチェックを外すと 1〜2 分）</li>
+    </ol>
+    <a class="btn primary" id="open-actions" target="_blank" rel="noopener"
+       href="https://github.com/taka1156/back-of-the-flyer/actions/workflows/set-accent.yml"
+       data-memo-site-href="https://github.com/{repository}/actions/workflows/set-accent.yml">GitHub で固定する ↗</a>
+    <details>
+      <summary>ファイルを直接書き換える場合</summary>
+      <p style="margin-top:8px">memo.config.json の branding をこの内容にして push すると、Actions の build が全ページに反映します（アイコン・OGP 画像の色は変わりません。揃えるなら手元で branding/render.py）。</p>
+      <pre id="out-json"></pre>
+    </details>
+  </section>
+
+  <footer><a href="index.html" data-memo-site="{site_name} 一覧">CheatSheet 一覧</a></footer>
+</div>
+<script>
+// 色の候補。ライト用はどれも白地とのコントラスト比 4.5 以上
+const PRESETS = [
+  ['シアン', '#00d4ff', '#0077b6'],
+  ['ミント', '#3ddc97', '#0f7a50'],
+  ['アンバー', '#ffb454', '#a15c00'],
+  ['ラベンダー', '#b392f0', '#6f42c1'],
+  ['スカイ', '#79c0ff', '#0969da'],
+  ['コーラル', '#ff7b72', '#c0362c'],
+  ['ピンク', '#ff79c6', '#b5307a'],
+  ['ライム', '#c3e88d', '#4d7a12'],
+];
+const DARK_BG = '#0a0e14', LIGHT_BG = '#f6f7f9';
+const $ = id => document.getElementById(id);
+
+const hex6 = c => {
+  c = c.trim().toLowerCase();
+  return /^#[0-9a-f]{3}$/.test(c) ? '#' + [...c.slice(1)].map(x => x + x).join('') : c;
+};
+const rgb = c => [1, 3, 5].map(i => parseInt(hex6(c).slice(i, i + 2), 16));
+const lum = c => {
+  const [r, g, b] = rgb(c).map(v => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+const contrast = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+const darken = (c, ratio) => '#' + rgb(c).map(v => Math.round(v * ratio).toString(16).padStart(2, '0')).join('');
+// memolib/config.py の light_accent と同じ計算（白地でコントラスト比 4.5 以上になるまで暗くする）
+const lightAccent = c => {
+  let ratio = 1;
+  while (contrast(darken(c, ratio), '#ffffff') < 4.5 && ratio > 0) ratio = Math.round((ratio - 0.02) * 100) / 100;
+  return darken(c, Math.max(ratio, 0));
+};
+
+const current = { dark: hex6($('cur-dark').textContent), light: hex6($('cur-light').textContent) };
+$('cur-dark-dot').style.background = current.dark;
+$('cur-light-dot').style.background = current.light;
+const state = { dark: current.dark, light: current.light, auto: lightAccent(current.dark) === current.light };
+
+// 候補のボタン
+for (const [name, dark, light] of PRESETS) {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'preset';
+  b.dataset.dark = dark;
+  b.dataset.light = light;
+  b.innerHTML = `<span class="dots"><i class="dot" style="background:${dark}"></i><i class="dot" style="background:${light}"></i></span>${name}`;
+  b.addEventListener('click', () => { Object.assign(state, { dark, light, auto: false }); render(); });
+  $('presets').append(b);
+}
+
+$('pick-dark').addEventListener('input', e => { state.dark = e.target.value; render(); });
+$('pick-light').addEventListener('input', e => { state.light = e.target.value; render(); });
+$('auto-light').addEventListener('change', e => { state.auto = e.target.checked; render(); });
+
+const dark = window.matchMedia('(prefers-color-scheme: dark)');
+dark.addEventListener('change', () => render());
+
+function render() {
+  if (state.auto) state.light = lightAccent(state.dark);
+  const { dark: d, light: l, auto } = state;
+  // このページ自体も選んだ色にする（memo:head の html:root より強いインラインで上書き）
+  document.documentElement.style.setProperty('--accent', dark.matches ? d : l);
+
+  $('pick-dark').value = d;
+  $('pick-light').value = l;
+  $('pick-light').disabled = auto;
+  $('auto-light').checked = auto;
+  $('pick-dark-hex').textContent = d;
+  $('pick-light-hex').textContent = l + (auto ? '（自動）' : '');
+  for (const b of $('presets').children)
+    b.setAttribute('aria-pressed', String(!auto && b.dataset.dark === d && b.dataset.light === l));
+
+  for (const [mode, c, bg] of [['dark', d, DARK_BG], ['light', l, LIGHT_BG]]) {
+    document.querySelectorAll(`[data-ac="${mode}"]`).forEach(el => { el.style.color = c; });
+    document.querySelectorAll(`[data-acb="${mode}"]`).forEach(el => { el.style.borderColor = c; });
+    const r = contrast(c, bg), el = $('cr-' + mode);
+    el.className = 'cr' + (r < 4.5 ? ' bad' : '');
+    el.textContent = r < 4.5 ? `コントラスト比 ${r.toFixed(1)}：背景に対して薄く、文字が読みにくい色です`
+                             : `コントラスト比 ${r.toFixed(1)}`;
+  }
+
+  $('out-dark').textContent = d;
+  // 自動のときは入力欄を空のままにしてもらう（Actions 側で accent から決まる）
+  $('out-light').textContent = auto ? '（空のまま）' : l;
+  $('out-light').style.opacity = auto ? '.6' : '';
+  const brand = auto ? { accent: d } : { accent: d, accent_light: l };
+  $('out-json').textContent = '"branding": ' + JSON.stringify(brand, null, 2);
+}
+
+// コピー（自動のときの accent_light は空文字をコピーする）
+document.querySelectorAll('[data-copy]').forEach(btn => btn.addEventListener('click', async () => {
+  const id = btn.dataset.copy;
+  const text = id === 'out-light' && state.auto ? '' : $(id).textContent;
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    const t = document.createElement('textarea');
+    t.value = text; document.body.append(t); t.select();
+    try { document.execCommand('copy'); } catch {}
+    t.remove();
+  }
+  const note = btn.nextElementSibling;
+  note.hidden = false;
+  setTimeout(() => { note.hidden = true; }, 1500);
+}));
+
+render();
+</script>
+</body>
+</html>

@@ -4,7 +4,7 @@
 
 > Vite・Vitest・Oxlint などを 1 つにまとめた Vite+ の機能と、vp コマンドの使い方を用途別に一覧にしたチートシート。
 
-- URL: https://repo.github.io/sample/vite-plus.html
+- URL: https://cs.taka1156.site/vite-plus.html
 - タグ: Vite, JavaScript, ツール
 - 日付: 2026-11-07
 
@@ -187,7 +187,7 @@ React・Vue・Svelte・Solid など Vite ベースのもの、メタフレーム
 
 組み込みコマンド（ `dev` ・ `build` ・ `test` など）は package.json の同名スクリプトでは上書きできない。スクリプトの方を動かすときは `vp run dev` 。
 
-（元のページで操作できます → https://repo.github.io/sample/vite-plus.html#cheatsheet）
+（元のページで操作できます → https://cs.taka1156.site/vite-plus.html#cheatsheet）
 
 ## 設定：vite.config.ts 1 つにまとめる
 
